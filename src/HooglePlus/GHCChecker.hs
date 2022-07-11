@@ -14,6 +14,7 @@ import Synquid.Pretty as Pretty
 import Database.Util
 import HooglePlus.Utils
 import HooglePlus.FilterTest (runChecks)
+import HooglePlus.Example
 
 import Control.Exception
 import Control.Monad.Trans
@@ -68,13 +69,14 @@ checkStrictness' tyclassCount lambdaExpr typeExpr modules = GHC.runGhc (Just lib
     -- Establishing GHC session
     env <- getSession
     dflags <- getSessionDynFlags
-    let dflags' = (updOptLevel 2 dflags)
+    let dflags' = (updOptLevel 2 dflags)    
     setSessionDynFlags $ dflags'
 
     -- Compile to core
     target <- guessTarget fileName Nothing
     setTargets [target]
     load LoadAllTargets
+
     modSum <- getModSummary $ mkModuleName "Temp"
 
     pmod <- parseModule modSum      -- ModuleSummary
@@ -95,7 +97,7 @@ checkStrictness' tyclassCount lambdaExpr typeExpr modules = GHC.runGhc (Just lib
     case decl of
         NonRec id rest -> return $ isStrict tyclassCount decl
         _ -> error "checkStrictness: recursive expression found"
-
+    
     where
         findOurBinding bs = head $ filter (\x-> ourFunctionName `isInfixOf` (showSDocUnsafe $ ppr x)) bs
         getStrictnessSig x = parseStrictnessSig $ showSDocUnsafe $ ppr $ x
@@ -122,15 +124,15 @@ checkStrictness tyclassCount body sig modules =
         (\(SomeException _) -> return False)
         (checkStrictness' tyclassCount body sig modules)
 
-check :: Goal -> SearchParams -> Chan Message -> Chan Message -> IO ()
-check goal searchParams solverChan checkerChan = catch
-    (evalStateT (check_ goal searchParams solverChan checkerChan) emptyFilterState)
+check :: Goal -> SearchParams -> Chan Message -> Chan Message -> String -> IO ()
+check goal searchParams solverChan checkerChan example = catch
+    (evalStateT (check_ goal searchParams solverChan checkerChan example) emptyFilterState)
     (\err ->
         writeChan checkerChan (MesgLog 0 "filterCheck" ("error: " ++ show err)) >>
         writeChan checkerChan (MesgClose (CSError err)))
 
-check_ :: MonadIO m => Goal -> SearchParams -> Chan Message -> Chan Message -> FilterTest m ()
-check_ goal searchParams solverChan checkerChan = do
+check_ :: MonadIO m => Goal -> SearchParams -> Chan Message -> Chan Message -> Example -> FilterTest m ()
+check_ goal searchParams solverChan checkerChan example = do
     msg <- liftIO $ readChan solverChan
     handleMessages solverChan checkerChan msg
     return ()
@@ -149,13 +151,16 @@ check_ goal searchParams solverChan checkerChan = do
                 bypass message = liftIO $ writeChan checkerChan message
 
         (env, destType) = preprocessEnvFromGoal goal
-        executeCheck = runGhcChecks searchParams env destType
+        executeCheck prog = do 
+            ghcChecks <- runGhcChecks searchParams env destType prog
+            exampleChecks <- runExampleChecks searchParams env destType prog example
+            return $ ghcChecks && exampleChecks
 
 
 -- validate type signiture, run demand analysis, and run filter test
 -- checks the end result type checks; all arguments are used; and that the program will not immediately fail
 runGhcChecks :: MonadIO m => SearchParams -> Environment -> RType -> UProgram -> FilterTest m Bool
-runGhcChecks params env goalType prog = let
+runGhcChecks params env goalType prog  = let
     -- constructs program and its type signature as strings
     (modules, funcSig, body, argList) = extractSolution env goalType prog
     tyclassCount = length $ Prelude.filter (\(id, _) -> tyclassArgBase `isPrefixOf` id) argList
@@ -164,16 +169,29 @@ runGhcChecks params env goalType prog = let
     disableFilter = _disableFilter params
     in do
         typeCheckResult <- if disableDemand then return (Right True) else liftIO $ runInterpreter $ checkType expr modules
-        strictCheckResult <- if disableDemand then return True else liftIO $ checkStrictness tyclassCount body funcSig modules
+        strictCheckResult <- return True --if disableDemand then return True else liftIO $ checkStrictness tyclassCount body funcSig modules
         filterCheckResult <- if disableFilter then return True else runChecks env goalType prog
         case typeCheckResult of
             Left err -> liftIO $ putStrLn (displayException err) >> return False
             Right False -> liftIO $ putStrLn "Program does not typecheck" >> return False
             Right True -> return $ strictCheckResult && filterCheckResult
 
+-- run the match algorithm againts an example
+runExampleChecks :: MonadIO m => SearchParams -> Environment -> RType -> UProgram -> Example -> FilterTest m Bool
+runExampleChecks params env goalType prog example = 
+    let (_, _, body, argList) = extractSolution env goalType prog in
+        if "Symbol." `isInfixOf` body then do
+            -- TODO parse
+            -- TODO fill here the code to call the match algorithm,
+            -- and delete return True
+            return True
+        else 
+            return True 
+
 -- ensures that the program type-checks
 checkType :: String -> [String] -> Interpreter Bool
 checkType expr modules = do
+    loadModules ["symbol-places/Symbol.hs"]
     setImports modules
     -- Ensures that if there's a problem we'll know
     Language.Haskell.Interpreter.typeOf expr

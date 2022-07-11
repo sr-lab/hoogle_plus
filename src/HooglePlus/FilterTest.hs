@@ -162,7 +162,7 @@ runInterpreter' timeInMicro exec =
       srcPath <- getDataFileName "InternalTypeGen.hs"
       unsafeRunInterpreterWithArgs ["-fno-omit-yields"] $ do
     
-        loadModules [srcPath]
+        loadModules [srcPath, "symbol-places/Symbol.hs"]
         setTopLevelModules ["InternalTypeGen"]
     
         exec

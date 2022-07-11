@@ -28,6 +28,7 @@ import HooglePlus.Stats
 import Types.Encoder
 import HooglePlus.GHCChecker
 import HooglePlus.Utils
+import HooglePlus.Example
 
 import Control.Monad
 import Control.Lens ((^.))
@@ -70,11 +71,14 @@ programName = "hoogleplus"
 versionName = "0.1"
 releaseDate = fromGregorian 2019 3 10
 
+type Example = String
+
 -- | Type-check and synthesize a program, according to command-line arguments
 main = do
     res <- cmdArgsRun $ mode
     case res of
         Synthesis { file
+                  , exampleStr
                   , libs
                   , env_file_path_in
                   , app_max
@@ -113,7 +117,9 @@ main = do
                         }
             let synquidParams =
                     defaultSynquidParams {Main.envPath = env_file_path_in}
-            executeSearch synquidParams searchParams file
+            case parseExample exampleStr of
+              Nothing -> putStrLn "Error parsing example."
+              Just example -> executeSearch synquidParams searchParams file example
         Generate {preset = (Just preset)} -> do
             precomputeGraph (getOptsFromPreset preset)
         Generate Nothing files pkgs mdls d ho pathToEnv hoPath -> do
@@ -162,7 +168,8 @@ data CommandLineArgs
         disable_relevancy :: Bool,
         disable_copy_trans :: Bool,
         disable_blacklist :: Bool,
-        disable_filter :: Bool
+        disable_filter :: Bool,
+        exampleStr :: String
       }
       | Generate {
         -- | Input
@@ -179,6 +186,7 @@ data CommandLineArgs
 
 synt = Synthesis {
   file                = ""              &= typFile &= argPos 0,
+  exampleStr        = ""              &= name "example" &= help ("Example to test"),
   libs                = []              &= args &= typ "FILES",
   env_file_path_in    = defaultEnvPath  &= help ("Environment file path (default:" ++ (show defaultEnvPath) ++ ")"),
   app_max             = 6               &= help ("Maximum depth of an application term (default: 6)") &= groupname "Explorer parameters",
@@ -240,14 +248,14 @@ precomputeGraph opts = generateEnv opts >>= writeEnv (Types.Generate.envPath opt
 
 
 -- | Parse and resolve file, then synthesize the specified goals
-executeSearch :: SynquidParams -> SearchParams  -> String -> IO ()
-executeSearch synquidParams searchParams query = do
+executeSearch :: SynquidParams -> SearchParams  -> String -> String -> IO ()
+executeSearch synquidParams searchParams query example = do
   env <- readEnv
   goal <- envToGoal env query
   solverChan <- newChan
   checkerChan <- newChan
   workerS <- forkIO $ synthesize searchParams goal solverChan
-  workerC <- forkIO $ check goal searchParams solverChan checkerChan
+  workerC <- forkIO $ check goal searchParams solverChan checkerChan example
   readChan checkerChan >>= (handleMessages checkerChan)
   where
     logLevel = searchParams ^. explorerLogLevel
