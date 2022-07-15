@@ -71,8 +71,6 @@ programName = "hoogleplus"
 versionName = "0.1"
 releaseDate = fromGregorian 2019 3 10
 
-type Example = String
-
 -- | Type-check and synthesize a program, according to command-line arguments
 main = do
     res <- cmdArgsRun $ mode
@@ -248,7 +246,7 @@ precomputeGraph opts = generateEnv opts >>= writeEnv (Types.Generate.envPath opt
 
 
 -- | Parse and resolve file, then synthesize the specified goals
-executeSearch :: SynquidParams -> SearchParams  -> String -> String -> IO ()
+executeSearch :: SynquidParams -> SearchParams  -> String -> Example -> IO ()
 executeSearch synquidParams searchParams query example = do
   env <- readEnv
   goal <- envToGoal env query

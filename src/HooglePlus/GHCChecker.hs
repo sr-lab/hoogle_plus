@@ -49,6 +49,13 @@ import Control.Concurrent.Chan
 import Control.Monad.Trans.State
 import Control.Concurrent
 
+-- FIXME remove some?
+import SymbolicMatch.Samples
+import qualified SymbolicMatch.Expr as Expr
+import qualified SymbolicMatch.Eval as Eval (eval)
+import qualified SymbolicMatch.State as State (init)
+import qualified SymbolicMatch.Match as Match (matchExprsPretty)
+
 showGhc :: (Outputable a) => a -> String
 showGhc = showPpr unsafeGlobalDynFlags
 
@@ -124,7 +131,7 @@ checkStrictness tyclassCount body sig modules =
         (\(SomeException _) -> return False)
         (checkStrictness' tyclassCount body sig modules)
 
-check :: Goal -> SearchParams -> Chan Message -> Chan Message -> String -> IO ()
+check :: Goal -> SearchParams -> Chan Message -> Chan Message -> Example -> IO ()
 check goal searchParams solverChan checkerChan example = catch
     (evalStateT (check_ goal searchParams solverChan checkerChan example) emptyFilterState)
     (\err ->
@@ -140,9 +147,11 @@ check_ goal searchParams solverChan checkerChan example = do
         handleMessages solverChan checkChan msg =
             case msg of
                 (MesgP (program, stats, _)) -> do
-                    programPassedChecks <- executeCheck program
+                    checkResult <- executeCheck program
                     state <- get
-                    if programPassedChecks then (bypass (MesgP (program, stats, state))) >> next else next
+                    case checkResult of
+                        Just program' -> (bypass (MesgP (program', stats, state))) >> next 
+                        Nothing -> next
                 (MesgClose _) -> bypass msg
                 _ -> (bypass msg) >> next
 
@@ -151,11 +160,12 @@ check_ goal searchParams solverChan checkerChan example = do
                 bypass message = liftIO $ writeChan checkerChan message
 
         (env, destType) = preprocessEnvFromGoal goal
-        executeCheck prog = do 
+        executeCheck prog = do -- returns the program with symbol replaced
             ghcChecks <- runGhcChecks searchParams env destType prog
             exampleChecks <- runExampleChecks searchParams env destType prog example
-            return $ ghcChecks && exampleChecks
-
+            if ghcChecks 
+                then return exampleChecks
+                else return Nothing
 
 -- validate type signiture, run demand analysis, and run filter test
 -- checks the end result type checks; all arguments are used; and that the program will not immediately fail
@@ -176,17 +186,48 @@ runGhcChecks params env goalType prog  = let
             Right False -> liftIO $ putStrLn "Program does not typecheck" >> return False
             Right True -> return $ strictCheckResult && filterCheckResult
 
--- run the match algorithm againts an example
-runExampleChecks :: MonadIO m => SearchParams -> Environment -> RType -> UProgram -> Example -> FilterTest m Bool
+-- FIXME REFACTOR
+-- run the match algorithm against an example and return a new program with the symbols replaced
+runExampleChecks :: MonadIO m => SearchParams -> Environment -> RType -> UProgram -> Example -> FilterTest m (Maybe UProgram)
 runExampleChecks params env goalType prog example = 
-    let (_, _, body, argList) = extractSolution env goalType prog in
-        if "Symbol." `isInfixOf` body then do
-            -- TODO parse
-            -- TODO fill here the code to call the match algorithm,
-            -- and delete return True
-            return True
-        else 
-            return True 
+    let (_, _, body, argList) = extractSolution env goalType prog
+        argsNames = map fst argList in
+        if "Symbol.symbol" `isInfixOf` body then do
+            let example' = Example { input = [nothing, pair z z]
+                                   , output = pair z z}
+            let (prog', expr) = programToExpr prog example' argsNames
+            liftIO $ putStrLn $ "Expr: \'" ++ Expr.showExpr functionsNames expr ++ "\'"
+            case Match.matchExprsPretty 150 expr functionsEnv (output example') of
+                Nothing -> return Nothing
+                Just cs -> trace ("CS="++show cs) $ return $ Just $ replaceSymsInProg cs prog'
+        else do
+            let example' = Example { input = [nothing, pair z z]
+                                   , output = pair z z}
+            let (prog', expr) = programToExpr prog example' argsNames
+            liftIO $ putStrLn $ Expr.showExpr functionsNames expr
+            let evalRes = Eval.eval (State.init functionsEnv 0) expr
+            liftIO $ putStrLn $ Expr.showExpr functionsNames evalRes
+            liftIO $ putStrLn $ Expr.showExpr functionsNames (output example')
+            if evalRes == output example' -- FIXME example' is to delete
+                then return $ Just prog
+                else return Nothing
+
+    where 
+        replaceSymsInProg :: [(Int, [Expr.Expr], Expr.Expr)] -> UProgram -> UProgram
+        replaceSymsInProg cs prog = case content prog of
+            PSymbol id 
+                | "Sym" `isPrefixOf` id ->  let
+                    symInd = read (drop (length "Sym") id) :: Int
+                    repl = lookup symInd cs' in
+                        case repl of
+                            Nothing -> error $ "Symbol " ++ id ++ " is not assigned in cs."
+                            Just repl' -> prog {content = PSymbol $ Expr.showExpr functionsNames repl'}
+                | otherwise -> prog
+            PApp id args -> prog {content = PApp id (map (replaceSymsInProg cs) args)}
+            _ -> error "Solution not expexted to have other than PSym and PApp."
+            where
+                cs' = map (\(a, _, b) -> (a, b)) cs -- we do not have functions here, so do not need args
+
 
 -- ensures that the program type-checks
 checkType :: String -> [String] -> Interpreter Bool
@@ -195,4 +236,4 @@ checkType expr modules = do
     setImports modules
     -- Ensures that if there's a problem we'll know
     Language.Haskell.Interpreter.typeOf expr
-    typeChecks expr
+    typeChecks expr 

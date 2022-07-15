@@ -18,6 +18,7 @@ data Case t = Case {
   expr :: Program t       -- ^ Result of the match in this case
 } deriving (Eq, Ord, Functor, Generic)
 
+
 -- | Program skeletons parametrized by information stored symbols, conditionals, and by node types
 data BareProgram t =
   PSymbol Id |                                -- ^ Symbol (variable or constant)
@@ -28,7 +29,7 @@ data BareProgram t =
   PFix [Id] (Program t) |                     -- ^ Fixpoint
   PLet Id (Program t) (Program t) |           -- ^ Let binding
   PHole |                                     -- ^ Hole (program to fill in)
-  PErr                                        -- ^ Error
+  PErr                                      -- ^ Error
   deriving (Eq, Ord, Functor, Generic)
 
 -- | Programs annotated with types
