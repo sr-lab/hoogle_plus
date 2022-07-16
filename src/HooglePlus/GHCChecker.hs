@@ -189,29 +189,18 @@ runGhcChecks params env goalType prog  = let
 -- FIXME REFACTOR
 -- run the match algorithm against an example and return a new program with the symbols replaced
 runExampleChecks :: MonadIO m => SearchParams -> Environment -> RType -> UProgram -> Example -> FilterTest m (Maybe UProgram)
-runExampleChecks params env goalType prog example = 
+runExampleChecks params env goalType prog example = do 
     let (_, _, body, argList) = extractSolution env goalType prog
-        argsNames = map fst argList in
-        if "Symbol.symbol" `isInfixOf` body then do
-            let example' = Example { input = [nothing, pair z z]
-                                   , output = pair z z}
-            let (prog', expr) = programToExpr prog example' argsNames
-            liftIO $ putStrLn $ "Expr: \'" ++ Expr.showExpr functionsNames expr ++ "\'"
-            case Match.matchExprsPretty 150 expr functionsEnv (output example') of
-                Nothing -> return Nothing
-                Just cs -> trace ("CS="++show cs) $ return $ Just $ replaceSymsInProg cs prog'
-        else do
-            let example' = Example { input = [nothing, pair z z]
-                                   , output = pair z z}
-            let (prog', expr) = programToExpr prog example' argsNames
-            liftIO $ putStrLn $ Expr.showExpr functionsNames expr
-            let evalRes = Eval.eval (State.init functionsEnv 0) expr
-            liftIO $ putStrLn $ Expr.showExpr functionsNames evalRes
-            liftIO $ putStrLn $ Expr.showExpr functionsNames (output example')
-            if evalRes == output example' -- FIXME example' is to delete
-                then return $ Just prog
-                else return Nothing
-
+    let argsNames = map fst argList
+    let example' = Example { input = [Expr.intToNat 2, Expr.intToNat 3]
+                           , output = Expr.intToNat 2} 
+    let (prog', expr) = programToExpr prog example' argsNames
+    liftIO $ putStrLn $ "Prog: \'" ++ body ++ "\'"
+    liftIO $ putStrLn $ "Expr: \'" ++ Expr.showExpr functionsNames expr ++ "\'"
+    liftIO $ putStrLn $ "Prog': \'" ++ show prog' ++ "\'"
+    case Match.matchExprsPretty 150 expr functionsEnv (output example') of
+        Nothing -> return Nothing
+        Just cs -> trace ("CS="++show cs) $ return $ Just $ replaceSymsInProg cs prog'
     where 
         replaceSymsInProg :: [(Int, [Expr.Expr], Expr.Expr)] -> UProgram -> UProgram
         replaceSymsInProg cs prog = case content prog of
