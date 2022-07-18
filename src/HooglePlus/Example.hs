@@ -2,21 +2,74 @@ module HooglePlus.Example (Example(..), parseExample, programToExpr) where
 
 import SymbolicMatch.Match
 import SymbolicMatch.Expr
-import SymbolicMatch.Samples (functionsInfo, lookupFun, isDataC)
+import SymbolicMatch.Samples (functionsInfo, lookupFun, isDataC, pair)
 import Types.Program
 import Data.Maybe (listToMaybe)
 import Data.List (partition, isPrefixOf)
+
+import Text.Parsec hiding (runParser)
+import Text.Parsec.String (Parser)
+import Text.Parsec.Token
+import Text.Parsec.Language (emptyDef)
 
 import Debug.Trace (trace)
 
 data Example = Example {
   input :: [Expr],
   output :: Expr
-}
+} deriving Show
 
 -- | convert example from a String to SymbolicMatch AST
-parseExample :: String -> Maybe Example
-parseExample str = Just Example {input = [], output = WildCard}
+parseExample :: String -> Either String Example
+parseExample str = case parse expr "" str of
+  Right example -> trace (showExpr [] example) $ case example of 
+    DataC "Pair" [e1, e2] -> case e1 of 
+      list@(DataC n _) 
+        | n `elem` ["Cons", "Nil"] -> Right Example { input = consToList list
+                                             , output = e2}
+        | otherwise -> Left "first element of an example must be a list" 
+      _ -> Left "first element of an example must be a list" 
+    _ -> Left "example must be a pair"
+  Left err -> Left $ show err
+  where
+    lexer :: TokenParser ()
+    lexer = makeTokenParser style
+      where
+        style = emptyDef { identStart = letter
+                         , identLetter = alphaNum
+                         , reservedNames = []}
+
+    expr :: Parser Expr
+    expr = try pair <|> dataConstr <|> nat <|> list <|> parens lexer expr
+
+    -- expression that does not need parens
+    insideExpr :: Parser Expr
+    insideExpr =  (do x <- identifier lexer; return $ DataC x [])
+              <|> nat
+              <|> pair
+              <|> list
+
+    nat :: Parser Expr
+    nat = do str <- many1 digit; return $ intToNat (read str)
+
+    list :: Parser Expr
+    list = do
+      l <- brackets lexer $ commaSep lexer expr
+      return $ listToCons l
+
+    pair :: Parser Expr
+    pair = parens lexer $ do
+      e1 <- expr
+      spaces; char ','; spaces
+      e2 <- expr
+      return $ SymbolicMatch.Samples.pair e1 e2
+
+    dataConstr :: Parser Expr
+    dataConstr = do
+      datac <- identifier lexer
+      spaces
+      exps <- many $ (parens lexer expr) <|> insideExpr
+      return $ DataC datac exps 
 
 -- | convert from Synquid AST to SymbolicMatch AST, replacing args by example inputs
 programToExpr :: UProgram -- solution in Synquid AST

@@ -116,8 +116,8 @@ main = do
             let synquidParams =
                     defaultSynquidParams {Main.envPath = env_file_path_in}
             case parseExample exampleStr of
-              Nothing -> putStrLn "Error parsing example."
-              Just example -> executeSearch synquidParams searchParams file example
+              Left err -> putStrLn err
+              Right example -> executeSearch synquidParams searchParams file example
         Generate {preset = (Just preset)} -> do
             precomputeGraph (getOptsFromPreset preset)
         Generate Nothing files pkgs mdls d ho pathToEnv hoPath -> do

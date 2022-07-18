@@ -192,13 +192,11 @@ runExampleChecks :: MonadIO m => SearchParams -> Environment -> RType -> UProgra
 runExampleChecks params env goalType prog example = do 
     let (_, _, body, argList) = extractSolution env goalType prog
     let argsNames = map fst argList
-    let example' = Example { input = [Expr.intToNat 2, Expr.intToNat 3]
-                           , output = Expr.intToNat 2} 
-    let (prog', expr) = programToExpr prog example' argsNames
+    let (prog', expr) = programToExpr prog example argsNames
     liftIO $ putStrLn $ "Prog: \'" ++ body ++ "\'"
     liftIO $ putStrLn $ "Expr: \'" ++ Expr.showExpr functionsNames expr ++ "\'"
     liftIO $ putStrLn $ "Prog': \'" ++ show prog' ++ "\'"
-    case Match.matchExprsPretty 150 expr functionsEnv (output example') of
+    case Match.matchExprsPretty 150 expr functionsEnv (output example) of
         Nothing -> return Nothing
         Just cs -> trace ("CS="++show cs) $ return $ Just $ replaceSymsInProg cs prog'
     where 
