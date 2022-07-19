@@ -1,3 +1,6 @@
 module Symbol
 symbolMaybe :: Maybe a
 symbolInt :: Int
+symbolList :: [a]
+--symbolGeneral :: a
+symbolEither :: Either a b

@@ -189,21 +189,23 @@ runGhcChecks params env goalType prog  = let
         case typeCheckResult of
             Left err -> liftIO $ putStrLn (displayException err) >> return False
             Right False -> liftIO $ putStrLn "Program does not typecheck" >> return False
-            Right True -> return $ strictCheckResult && filterCheckResult
+            Right True -> if strictCheckResult && filterCheckResult then return $ strictCheckResult && filterCheckResult
+                else do
+                    liftIO $ putStrLn "   Rejected by GHC."
+                    return False
 
--- FIXME REFACTOR
 -- run the match algorithm against an example and return a new program with the symbols replaced
 runExampleChecks :: MonadIO m => SearchParams -> Environment -> RType -> UProgram -> Example -> FilterTest m (Maybe UProgram)
 runExampleChecks params env goalType prog example = do 
     let (_, _, body, argList) = extractSolution env goalType prog
     let argsNames = map fst argList
     let (prog', expr) = programToExpr prog example argsNames
-    liftIO $ putStrLn $ "Prog: \'" ++ body ++ "\'"
-    liftIO $ putStrLn $ "Expr: \'" ++ Expr.showExpr functionsNames expr ++ "\'"
-    liftIO $ putStrLn $ "Prog': \'" ++ show prog' ++ "\'"
+    liftIO $ putStrLn $ "Test \'" ++ show prog' ++ "\'"
     case Match.matchExprsPretty 150 expr functionsEnv (output example) of
-        Nothing -> return Nothing
-        Just cs -> trace ("CS="++show cs) $ return $ Just $ replaceSymsInProg cs prog'
+        Nothing -> do 
+            liftIO $ putStrLn "   Rejected by match."
+            return Nothing
+        Just cs -> return $ Just $ replaceSymsInProg cs prog'
     where 
         replaceSymsInProg :: [(Int, [Expr.Expr], Expr.Expr)] -> UProgram -> UProgram
         replaceSymsInProg cs prog = case content prog of

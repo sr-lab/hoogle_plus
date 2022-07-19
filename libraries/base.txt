@@ -94,11 +94,11 @@ foldr :: (a -> b -> b) -> b -> [a] -> b
 foldr1 :: (a -> a -> a) -> [a] -> a
 scanr :: (a -> b -> b) -> b -> [a] -> [b]
 scanr1 :: (a -> a -> a) -> [a] -> [a]
-iterate :: (a -> a) -> a -> [a]
-iterate' :: (a -> a) -> a -> [a]
-repeat :: a -> [a]
+--iterate :: (a -> a) -> a -> [a]
+--iterate' :: (a -> a) -> a -> [a]
+--repeat :: a -> [a]
 replicate :: Int -> a -> [a]
-cycle :: [a] -> [a]
+--cycle :: [a] -> [a]
 take :: Int -> [a] -> [a]
 drop :: Int -> [a] -> [a]
 sum :: Num a => [a] -> a
