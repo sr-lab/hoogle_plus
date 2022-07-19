@@ -198,10 +198,10 @@ compareSolution modules solution otherSolutions funcSig time = do
 
 runChecks :: MonadIO m => Environment -> RType -> UProgram -> FilterTest m Bool
 runChecks env goalType prog =
-  and <$> mapM (\f -> f modules funcSig body) checks
+  and <$> mapM (\f -> f modules' funcSig body) checks
   where
     (modules, funcSig, body, _) = extractSolution env goalType prog
-
+    modules' = filter (/= "Symbol") modules -- Symbol is only for generating the database
     checks = [ checkSolutionNotCrash
              , checkDuplicates]
 

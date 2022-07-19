@@ -65,8 +65,9 @@ checkStrictness' :: Int -> String -> String -> [String] -> IO Bool
 checkStrictness' tyclassCount lambdaExpr typeExpr modules = GHC.runGhc (Just libdir) $ do
     tmpDir <- liftIO $ getTmpDir
     -- TODO: can we use GHC to dynamically compile strings? I think not
+    let modules' = filter (/= "Symbol") modules
     let toModuleImportStr = (printf "import %s\n") :: String -> String
-    let moduleImports = concatMap toModuleImportStr modules
+    let moduleImports = concatMap toModuleImportStr modules'
     let sourceCode = printf "module Temp where\n%s\n%s :: %s\n%s = %s\n" moduleImports ourFunctionName typeExpr ourFunctionName lambdaExpr
     baseName <- liftIO $ nextRandom
     let baseNameStr = show baseName ++ ".hs"
@@ -161,11 +162,14 @@ check_ goal searchParams solverChan checkerChan example = do
 
         (env, destType) = preprocessEnvFromGoal goal
         executeCheck prog = do -- returns the program with symbol replaced
-            ghcChecks <- runGhcChecks searchParams env destType prog
             exampleChecks <- runExampleChecks searchParams env destType prog example
-            if ghcChecks 
-                then return exampleChecks
-                else return Nothing
+            case exampleChecks of 
+                Just prog' -> do
+                    ghcChecks <- runGhcChecks searchParams env destType prog'
+                    if ghcChecks 
+                        then return exampleChecks
+                        else return Nothing
+                Nothing -> return Nothing
 
 -- validate type signiture, run demand analysis, and run filter test
 -- checks the end result type checks; all arguments are used; and that the program will not immediately fail
@@ -177,9 +181,10 @@ runGhcChecks params env goalType prog  = let
     expr = body ++ " :: " ++ funcSig
     disableDemand = _disableDemand params
     disableFilter = _disableFilter params
+    modules' = filter (/= "Symbol") modules -- Symbol is only for generating the database
     in do
-        typeCheckResult <- if disableDemand then return (Right True) else liftIO $ runInterpreter $ checkType expr modules
-        strictCheckResult <- return True --if disableDemand then return True else liftIO $ checkStrictness tyclassCount body funcSig modules
+        typeCheckResult <- if disableDemand then return (Right True) else liftIO $ runInterpreter $ checkType expr modules'
+        strictCheckResult <- if disableDemand then return True else liftIO $ checkStrictness tyclassCount body funcSig modules'
         filterCheckResult <- if disableFilter then return True else runChecks env goalType prog
         case typeCheckResult of
             Left err -> liftIO $ putStrLn (displayException err) >> return False
@@ -208,7 +213,9 @@ runExampleChecks params env goalType prog example = do
                     repl = lookup symInd cs' in
                         case repl of
                             Nothing -> error $ "Symbol " ++ id ++ " is not assigned in cs."
-                            Just repl' -> prog {content = PSymbol $ Expr.showExpr functionsNames repl'}
+                            Just repl'
+                                | Expr.needsPar repl' -> prog {content = PSymbol $ "(" ++ Expr.showExpr functionsNames repl' ++ ")"}
+                                | otherwise -> prog {content = PSymbol $ Expr.showExpr functionsNames repl'}
                 | otherwise -> prog
             PApp id args -> prog {content = PApp id (map (replaceSymsInProg cs) args)}
             _ -> error "Solution not expexted to have other than PSym and PApp."
@@ -219,7 +226,6 @@ runExampleChecks params env goalType prog example = do
 -- ensures that the program type-checks
 checkType :: String -> [String] -> Interpreter Bool
 checkType expr modules = do
-    loadModules ["symbol-places/Symbol.hs"]
     setImports modules
     -- Ensures that if there's a problem we'll know
     Language.Haskell.Interpreter.typeOf expr
