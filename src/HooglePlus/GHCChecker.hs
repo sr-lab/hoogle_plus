@@ -55,6 +55,7 @@ import qualified SymbolicMatch.Expr as Expr
 import qualified SymbolicMatch.Eval as Eval (eval)
 import qualified SymbolicMatch.State as State (init)
 import qualified SymbolicMatch.Match as Match (matchExprsPretty)
+import qualified Data.Bool (bool)
 
 showGhc :: (Outputable a) => a -> String
 showGhc = showPpr unsafeGlobalDynFlags
@@ -166,9 +167,7 @@ check_ goal searchParams solverChan checkerChan example = do
             case exampleChecks of 
                 Just prog' -> do
                     ghcChecks <- runGhcChecks searchParams env destType prog'
-                    if ghcChecks 
-                        then return exampleChecks
-                        else return Nothing
+                    return $ Data.Bool.bool Nothing exampleChecks ghcChecks
                 Nothing -> return Nothing
 
 -- validate type signiture, run demand analysis, and run filter test
@@ -199,14 +198,17 @@ runExampleChecks :: MonadIO m => SearchParams -> Environment -> RType -> UProgra
 runExampleChecks params env goalType prog example = do 
     let (_, _, body, argList) = extractSolution env goalType prog
     let argsNames = map fst argList
-    let (prog', expr) = programToExpr prog example argsNames
+    let progWithoutTc = removeTc prog
+    let (prog', expr) = programToExpr progWithoutTc example argsNames
     liftIO $ putStrLn $ "Test \'" ++ show prog' ++ "\'"
     case Match.matchExprsPretty 150 expr functionsEnv (output example) of
         Nothing -> do 
             liftIO $ putStrLn "   Rejected by match."
             return Nothing
         Just cs -> return $ Just $ replaceSymsInProg cs prog'
-    where 
+    where
+        -- The symbols in prog are replaced by the result of match
+        -- also, when arguments of functions are @@ (typeclass instances)
         replaceSymsInProg :: [(Int, [Expr.Expr], Expr.Expr)] -> UProgram -> UProgram
         replaceSymsInProg cs prog = case content prog of
             PSymbol id 
@@ -223,6 +225,19 @@ runExampleChecks params env goalType prog example = do
             _ -> error "Solution not expexted to have other than PSym and PApp."
             where
                 cs' = map (\(a, _, b) -> (a, b)) cs -- we do not have functions here, so do not need args
+        
+        removeTc :: UProgram -> UProgram
+        removeTc p = case content p of
+            PSymbol _ -> p
+            PApp id args -> let args' = filter (not . isPSymWithTc) args in
+                p {content = PApp id args'}
+            where 
+                isPSymWithTc :: UProgram -> Bool
+                isPSymWithTc p = case content p of 
+                    PSymbol id
+                        | "@@" `isPrefixOf` id -> True
+                        | otherwise -> False
+                    _ -> False
 
 
 -- ensures that the program type-checks
