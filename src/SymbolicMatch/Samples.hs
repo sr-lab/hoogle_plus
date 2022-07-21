@@ -919,4 +919,14 @@ lookupFun id = listToMaybe $ map (\(int, _, _) -> int) $ filter (\(int, _, str)-
 
 -- returns whether name is a data constructor or not
 isDataC :: String -> Bool
-isDataC name = name `elem` ["Data.Either.Left", "Data.Either.Right", "Cons", "Nil", "Pair", "S", "Z", "Data.Maybe.Just", "Data.Maybe.Nothing", "Data.Bool.True", "Data.Bool.False"]
+isDataC name = name `elem` [ "Data.Either.Left"
+                           , "Data.Either.Right"
+                           , "Cons"
+                           , "Nil"
+                           , "Pair"
+                           , "S"
+                           , "Z"
+                           , "Data.Maybe.Just"
+                           , "Data.Maybe.Nothing"
+                           , "Data.Bool.True"
+                           , "Data.Bool.False"]

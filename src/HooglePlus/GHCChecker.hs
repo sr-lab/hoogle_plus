@@ -167,8 +167,12 @@ check_ goal searchParams solverChan checkerChan example = do
             case exampleChecks of 
                 Just prog' -> do
                     ghcChecks <- runGhcChecks searchParams env destType prog'
+                    if ghcChecks then liftIO $ putStrLn $ "Test \'" ++ show prog' ++ "\': accepted."
+                                 else liftIO $ putStrLn $ "Test \'" ++ show prog' ++ "\': rejected by GHC."
                     return $ Data.Bool.bool Nothing exampleChecks ghcChecks
-                Nothing -> return Nothing
+                Nothing -> do
+                    liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match."
+                    return Nothing
 
 -- validate type signiture, run demand analysis, and run filter test
 -- checks the end result type checks; all arguments are used; and that the program will not immediately fail
@@ -189,9 +193,7 @@ runGhcChecks params env goalType prog  = let
             Left err -> liftIO $ putStrLn (displayException err) >> return False
             Right False -> liftIO $ putStrLn "Program does not typecheck" >> return False
             Right True -> if strictCheckResult && filterCheckResult then return $ strictCheckResult && filterCheckResult
-                else do
-                    liftIO $ putStrLn "   Rejected by GHC."
-                    return False
+                else return False
 
 -- run the match algorithm against an example and return a new program with the symbols replaced
 runExampleChecks :: MonadIO m => SearchParams -> Environment -> RType -> UProgram -> Example -> FilterTest m (Maybe UProgram)
@@ -200,11 +202,8 @@ runExampleChecks params env goalType prog example = do
     let argsNames = map fst argList
     let progWithoutTc = removeTc prog
     let (prog', expr) = programToExpr progWithoutTc example argsNames
-    liftIO $ putStrLn $ "Test \'" ++ show prog' ++ "\'"
     case Match.matchExprsPretty 150 expr functionsEnv (output example) of
-        Nothing -> do 
-            liftIO $ putStrLn "   Rejected by match."
-            return Nothing
+        Nothing -> return Nothing
         Just cs -> return $ Just $ replaceSymsInProg cs prog'
     where
         -- The symbols in prog are replaced by the result of match
