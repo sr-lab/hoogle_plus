@@ -67,7 +67,7 @@ dependencies:
 - uuid
 - vector
 - z3
-- symbolic-match
+#- symbolic-match
 
 library:
   source-dirs:
