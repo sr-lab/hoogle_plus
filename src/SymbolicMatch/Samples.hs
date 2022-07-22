@@ -256,8 +256,8 @@ unconsF :: Expr
 unconsF = Lam [0]
   (Case (Var 0) 
     [
-      Alt "Nil" [] (DataC "Data.Maybe.Nothing" []),
-      Alt "Cons" [1, 2] (DataC "Data.Maybe.Just" [Var 1, Var 2])
+      Alt "Nil" [] nothing,
+      Alt "Cons" [1, 2] (just (pair (Var 1) (Var 2)))
     ]
   )
 
@@ -294,7 +294,7 @@ productF :: Expr
 productF = Lam [0]
   (Case (Var 0)
     [
-      Alt "Nil" [] z,
+      Alt "Nil" [] (s z), -- product [] = 1
       Alt "Cons" [1, 2] (App (Var $ -44) [Var 1, App (Var $ -46) [Var 2]])
     ]
   )
@@ -304,7 +304,7 @@ maximumF :: Expr
 maximumF = Lam [0]
   (Case (Var 0)
     [
-      Alt "Nil" [] z,
+      Alt "Nil" [] (DataC "Error" []),
       Alt "Cons" [1, 2] (App (Var $ -51) [Var 1, App (Var $ -47) [Var 2]])
     ]
   )
@@ -314,7 +314,7 @@ minimumF :: Expr
 minimumF = Lam [0]
   (Case (Var 0)
     [
-      Alt "Nil" [] z,
+      Alt "Nil" [] (DataC "Error" []),
       Alt "Cons" [1, 2] (App (Var $ -52) [Var 1, App (Var $ -48) [Var 2]])
     ]
   )
@@ -592,6 +592,14 @@ partitionEithersF =
 -- adapted from Data.Bool --
 ----------------------------
 -- data Bool = True | False
+
+-- True
+trueF :: Expr
+trueF = Lam [] true
+
+-- False
+falseF :: Expr
+falseF = Lam [] false
 
 -- (&&)
 andF :: Expr 
@@ -880,6 +888,8 @@ functionsInfo =
     -- either
 
     -- Data.Bool
+    (-62, trueF, "Data.Bool.True"),
+    (-63, falseF, "Data.Bool.False"),
     (-34, andF, "(Data.Bool.&&)"),
     (-35, orF, "(Data.Bool.||)"),
     (-36, boolF, "Data.Bool.bool"),

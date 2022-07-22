@@ -202,7 +202,7 @@ runExampleChecks params env goalType prog example = do
     let argsNames = map fst argList
     let progWithoutTc = removeTc prog
     let (prog', expr) = programToExpr progWithoutTc example argsNames
-    case Match.matchExprsPretty 150 expr functionsEnv (output example) of
+    case trace ("EXPR = " ++ Expr.showExpr functionsNames expr ++ "//// PROG: " ++ show prog) Match.matchExprsPretty 150 expr functionsEnv (output example) of
         Nothing -> return Nothing
         Just cs -> return $ Just $ replaceSymsInProg cs prog'
     where
