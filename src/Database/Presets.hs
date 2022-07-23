@@ -11,14 +11,14 @@ getOptsFromPreset PartialFunctions = genOptsTier2
 genOptsTier1 = defaultGenerationOpts {
   modules = myModules,
   pkgFetchOpts = Local {
-      files = ["libraries/symbol.txt", "libraries/tier1/base.txt", "libraries/tier1/bytestring.txt", "libraries/ghc-prim.txt"]
+      files = ["libraries/tier1/base.txt", "libraries/tier1/bytestring.txt", "libraries/ghc-prim.txt"]
       }
   }
 
 genOptsTier2 = genOptsTier1 {
   modules = myModules,
   pkgFetchOpts = Local {
-      files = ["libraries/symbol.txt", "libraries/base.txt", "libraries/bytestring.txt", "libraries/ghc-prim.txt"]
+      files = ["libraries/base.txt", "libraries/bytestring.txt", "libraries/ghc-prim.txt"]
       }
   }
 
@@ -36,6 +36,5 @@ myModules = [
   "Data.Function",
   -- ByteString
   "Data.ByteString.Lazy",
-  "Data.ByteString.Builder",
-  "Symbol"
-  ]
+  "Data.ByteString.Builder"
+  ] -- module Symbol is included only for generating the database

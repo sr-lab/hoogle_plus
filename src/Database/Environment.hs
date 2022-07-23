@@ -37,6 +37,9 @@ import qualified Types.Program as TP
 import Synquid.Util
 import qualified Debug.Trace as D
 
+import qualified HooglePlus.Example as Example
+
+import Debug.Trace (trace)
 
 writeEnv :: FilePath -> Environment -> IO ()
 writeEnv path env = B.writeFile path (encode env)
@@ -62,7 +65,7 @@ generateEnv genOpts = do
     let pkgOpts = pkgFetchOpts genOpts
     let mdls = modules genOpts
     let pathToHo = hoPath genOpts
-    let mbModuleNames = if length mdls > 0 then Just mdls else Nothing
+    let mbModuleNames = if length mdls > 0 then Just ("Symbol":mdls) else Nothing
     pkgFiles <- getFiles pkgOpts
     allEntriesByMdl <- filesToEntries pkgFiles True
     DD.cleanTmpFiles pkgOpts pkgFiles
@@ -126,7 +129,10 @@ toFunType t = t
 filesToEntries :: [FilePath] -> Bool -> IO (Map MdlName [Entry])
 filesToEntries fps renameFunc = do
     declsByModuleByFile <- mapM (\fp -> DC.readDeclarationsFromFile fp renameFunc) fps
-    return $ Map.unionsWith (++) declsByModuleByFile
+    -- we add to the existing components symbols (symbolInt, symbolList...)
+    -- that are going to be replaced by the match algorithm
+    let symbolModule = DC.readDeclarationsFromStrings Example.symbolsDecls renameFunc
+    return $ Map.unionsWith (++) (symbolModule:declsByModuleByFile)
 
 
 getFiles :: PackageFetchOpts -> IO [FilePath]

@@ -1,4 +1,4 @@
-module HooglePlus.Example (Example(..), parseExample, programToExpr) where
+module HooglePlus.Example (Example(..), parseExample, programToExpr, symbolsDecls) where
 
 import SymbolicMatch.Match
 import SymbolicMatch.Expr
@@ -12,7 +12,20 @@ import Text.Parsec.String (Parser)
 import Text.Parsec.Token
 import Text.Parsec.Language (emptyDef)
 
+import Text.Printf (printf)
+
 import Debug.Trace (trace)
+
+symbolsInfo :: [(String, String)]
+symbolsInfo = [
+  ("symbolInt", "Int"),
+  ("symbolList", "[a]"),
+  ("symbolMaybe", "Maybe a"),
+  ("symbolEither", "Either a b")
+  ]
+
+symbolsDecls :: [String]
+symbolsDecls = "module Symbol" : map (\(n,t) -> printf "%s :: %s" n t) symbolsInfo
 
 data Example = Example {
   input :: [Expr],

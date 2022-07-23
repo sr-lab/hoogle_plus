@@ -409,9 +409,12 @@ readDeclarationsFromFile fp renameFunc = do
     hSetEncoding h utf8
     s   <- hGetContents h
     let fileLines = lines s
-    let code = concat $ rights $ map parseLine fileLines
-    return $ renameSigs renameFunc "" code
+    return $ readDeclarationsFromStrings fileLines renameFunc
 
+readDeclarationsFromStrings :: [String] -> Bool -> Map MdlName [Entry]
+readDeclarationsFromStrings lines renameFunc =
+    let code = concat $ rights $ map parseLine lines in
+        renameSigs renameFunc "" code
 
 packageDependencies :: PkgName -> Bool -> IO [PkgName]
 packageDependencies pkg toDownload = do
