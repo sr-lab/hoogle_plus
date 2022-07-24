@@ -56,14 +56,15 @@ import qualified SymbolicMatch.Eval as Eval (eval)
 import qualified SymbolicMatch.State as State (init)
 import qualified SymbolicMatch.Match as Match (matchExprsPretty)
 import qualified Data.Bool (bool)
+import System.IO (stderr, hPutStrLn)
 
 showGhc :: (Outputable a) => a -> String
 showGhc = showPpr unsafeGlobalDynFlags
 
 ourFunctionName = "ghcCheckedFunction"
 
-checkStrictness' :: Int -> String -> String -> [String] -> IO Bool
-checkStrictness' tyclassCount lambdaExpr typeExpr modules = GHC.runGhc (Just libdir) $ do
+checkStrictness' :: Int -> Int -> String -> String -> [String] -> IO Bool
+checkStrictness' tyclassCount symbolCount lambdaExpr typeExpr modules = GHC.runGhc (Just libdir) $ do
     tmpDir <- liftIO $ getTmpDir
     -- TODO: can we use GHC to dynamically compile strings? I think not
     let modules' = filter (/= "Symbol") modules
@@ -104,7 +105,7 @@ checkStrictness' tyclassCount lambdaExpr typeExpr modules = GHC.runGhc (Just lib
     -- on the singatures. That would be enough to show that the relevancy requirement is not met.
 
     case decl of
-        NonRec id rest -> return $ isStrict tyclassCount decl
+        NonRec id rest -> return $ isStrict (tyclassCount + symbolCount) decl
         _ -> error "checkStrictness: recursive expression found"
     
     where
@@ -113,6 +114,7 @@ checkStrictness' tyclassCount lambdaExpr typeExpr modules = GHC.runGhc (Just lib
         isStrict n x = let
             strictnessSig = getStrictnessSig x
             argStrictness = splitByArg strictnessSig
+            -- do not care about the strictness of typeclass arguments
             restSigs = drop n argStrictness
             in not $ any (elem 'A') restSigs
         splitByArg :: String -> [String]
@@ -127,11 +129,11 @@ parseStrictnessSig result = let
         Just (match:_) -> match
         _ -> error $ "unable to find strictness in: " ++ result
 
-checkStrictness :: Int -> String -> String -> [String] -> IO Bool
-checkStrictness tyclassCount body sig modules =
+checkStrictness :: Int -> Int -> String -> String -> [String] -> IO Bool
+checkStrictness tyclassCount symbolCount body sig modules =
     handle
         (\(SomeException _) -> return False)
-        (checkStrictness' tyclassCount body sig modules)
+        (checkStrictness' tyclassCount symbolCount body sig modules)
 
 check :: Goal -> SearchParams -> Chan Message -> Chan Message -> Example -> IO ()
 check goal searchParams solverChan checkerChan example = catch
@@ -162,38 +164,87 @@ check_ goal searchParams solverChan checkerChan example = do
                 bypass message = liftIO $ writeChan checkerChan message
 
         (env, destType) = preprocessEnvFromGoal goal
-        executeCheck prog = do -- returns the program with symbol replaced
-            exampleChecks <- runExampleChecks searchParams env destType prog example
-            case exampleChecks of 
-                Just prog' -> do
-                    ghcChecks <- runGhcChecks searchParams env destType prog'
-                    if ghcChecks then liftIO $ putStrLn $ "Test \'" ++ show prog' ++ "\': accepted."
-                                 else liftIO $ putStrLn $ "Test \'" ++ show prog' ++ "\': rejected by GHC."
-                    return $ Data.Bool.bool Nothing exampleChecks ghcChecks
-                Nothing -> do
-                    liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match."
+        -- returns the program with symbols replaced
+        executeCheck prog = do
+            ghcChecks <- runGhcChecks searchParams env destType prog
+            if ghcChecks 
+                then do
+                    exampleChecks <- runExampleChecks searchParams env destType prog example
+                    case exampleChecks of 
+                        Just prog' -> do
+                            liftIO $ putStrLn $ "Test \'" ++ show prog' ++ "\': accepted."
+                            return exampleChecks
+                        Nothing -> do
+                            liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match."
+                            return Nothing
+                else do
+                    liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by GHC."
                     return Nothing
 
 -- validate type signiture, run demand analysis, and run filter test
 -- checks the end result type checks; all arguments are used; and that the program will not immediately fail
 runGhcChecks :: MonadIO m => SearchParams -> Environment -> RType -> UProgram -> FilterTest m Bool
 runGhcChecks params env goalType prog  = let
+    -- remove module prefix from prog (Symbol.)
+    prog' = removeProgModulePrefix prog
     -- constructs program and its type signature as strings
-    (modules, funcSig, body, argList) = extractSolution env goalType prog
+    (modules, funcSig, body, argList) = extractSolution env goalType prog'
     tyclassCount = length $ Prelude.filter (\(id, _) -> tyclassArgBase `isPrefixOf` id) argList
-    expr = body ++ " :: " ++ funcSig
+    -- all the used symbols in prog
+    symbols = Set.toList $ usedSymbols prog'
+    symbolCount = length symbols
+    -- body where the used symbols are also parameters
+    -- in order to typecheck and compile
+    body' = addParamsToLam body symbols
+    funcSig' = addParamsToSig funcSig (map lookupSymType symbols)
+    expr = body' ++ " :: " ++ funcSig'
     disableDemand = _disableDemand params
     disableFilter = _disableFilter params
     modules' = filter (/= "Symbol") modules -- Symbol is only for generating the database
     in do
         typeCheckResult <- if disableDemand then return (Right True) else liftIO $ runInterpreter $ checkType expr modules'
-        strictCheckResult <- if disableDemand then return True else liftIO $ checkStrictness tyclassCount body funcSig modules'
-        filterCheckResult <- if disableFilter then return True else runChecks env goalType prog
         case typeCheckResult of
-            Left err -> liftIO $ putStrLn (displayException err) >> return False
+            Left err -> liftIO $ hPutStrLn stderr (displayException err) >> return False
             Right False -> liftIO $ putStrLn "Program does not typecheck" >> return False
-            Right True -> if strictCheckResult && filterCheckResult then return $ strictCheckResult && filterCheckResult
-                else return False
+            Right True -> do
+                strictCheckResult <- if disableDemand then return True else liftIO $ checkStrictness tyclassCount symbolCount body' funcSig' modules'
+                if strictCheckResult 
+                    then do 
+                        filterCheckResult <- if disableFilter then return True else runChecks body' funcSig' modules'
+                        return filterCheckResult
+                    else
+                        return False
+
+    where
+        -- returns all the used symbols
+        usedSymbols :: UProgram -> Set.Set String
+        usedSymbols prog = 
+            case content prog of
+                (PSymbol id)
+                    | isSymbol id -> Set.singleton id
+                    | otherwise -> Set.empty
+                (PApp id args) -> let
+                    sArgs = foldr (\c r -> Set.union (usedSymbols c) r) Set.empty args in
+                        if isSymbol id then Set.insert id sArgs else sArgs
+                _ -> error "Solution expected to have only PSym and PApp"
+        
+        addParamsToLam :: String -> [String] -> String
+        addParamsToLam body syms = foldr (\c r -> printf "(\\%s -> %s)" c r) body syms
+
+        addParamsToSig :: String -> [String] -> String
+        addParamsToSig sig types = foldr (\c r -> printf "%s -> %s" c r) sig types
+
+        -- remove module prefix of all occurences of symbols
+        -- ex.: Symbol.symbolInt -> symbolInt
+        removeProgModulePrefix :: UProgram -> UProgram
+        removeProgModulePrefix p = case content p of
+            PSymbol id
+                | isSymbolWithPrefix id -> p {content = PSymbol (removeModulePrefix id)}
+                | otherwise -> p
+            PApp id args -> let
+                id' = if isSymbolWithPrefix id then removeModulePrefix id else id
+                args' = map removeProgModulePrefix args in
+                    p {content = PApp id' args'}
 
 -- run the match algorithm against an example and return a new program with the symbols replaced
 runExampleChecks :: MonadIO m => SearchParams -> Environment -> RType -> UProgram -> Example -> FilterTest m (Maybe UProgram)
@@ -202,7 +253,7 @@ runExampleChecks params env goalType prog example = do
     let argsNames = map fst argList
     let progWithoutTc = removeTc prog
     let (prog', expr) = programToExpr progWithoutTc example argsNames
-    case trace ("EXPR = " ++ Expr.showExpr functionsNames expr ++ "//// PROG: " ++ show prog) Match.matchExprsPretty 150 expr functionsEnv (output example) of
+    case Match.matchExprsPretty 150 expr functionsEnv (output example) of
         Nothing -> return Nothing
         Just cs -> return $ Just $ replaceSymsInProg cs prog'
     where

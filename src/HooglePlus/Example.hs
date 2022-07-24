@@ -1,4 +1,11 @@
-module HooglePlus.Example (Example(..), parseExample, programToExpr, symbolsDecls) where
+module HooglePlus.Example ( Example(..)
+                          , parseExample
+                          , programToExpr
+                          , symbolsDecls
+                          , isSymbolWithPrefix
+                          , isSymbol
+                          , lookupSymType
+                          , removeModulePrefix) where
 
 import SymbolicMatch.Match
 import SymbolicMatch.Expr
@@ -24,8 +31,32 @@ symbolsInfo = [
   ("symbolEither", "Either a b")
   ]
 
+symbolModule :: String
+symbolModule = "Symbol"
+
+symbolPrefix = symbolModule ++ "."
+
+symbolsModPrefix :: [String]
+symbolsModPrefix = map (\(s,_) -> printf "%s.%s" symbolModule s) symbolsInfo
+
 symbolsDecls :: [String]
-symbolsDecls = "module Symbol" : map (\(n,t) -> printf "%s :: %s" n t) symbolsInfo
+symbolsDecls = (printf "module %s" symbolModule) : map (\(n,t) -> printf "%s :: %s" n t) symbolsInfo
+
+isSymbolWithPrefix :: String -> Bool
+isSymbolWithPrefix s = s `elem` symbolsModPrefix
+
+lookupSymType :: String -> String
+lookupSymType sym = case lookup sym symbolsInfo of
+  Just res -> res
+  Nothing -> error $ printf "Symbol %s not found." sym
+
+isSymbol :: String -> Bool
+isSymbol s = s `elem` map fst symbolsInfo
+
+removeModulePrefix :: String -> String
+removeModulePrefix symName
+  | symbolPrefix `isPrefixOf` symName = drop (length symbolPrefix) symName
+  | otherwise = error "Symbol name does not have prefix."
 
 data Example = Example {
   input :: [Expr],

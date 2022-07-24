@@ -162,7 +162,7 @@ runInterpreter' timeInMicro exec =
       srcPath <- getDataFileName "InternalTypeGen.hs"
       unsafeRunInterpreterWithArgs ["-fno-omit-yields"] $ do
     
-        loadModules [srcPath, "symbol-places/Symbol.hs"]
+        loadModules [srcPath]
         setTopLevelModules ["InternalTypeGen"]
     
         exec
@@ -196,14 +196,12 @@ compareSolution modules solution otherSolutions funcSig time = do
     let prop = buildDupCheckProp (solution, otherSolutions) funcSig time
     interpret prop (as :: IO Result) >>= liftIO
 
-runChecks :: MonadIO m => Environment -> RType -> UProgram -> FilterTest m Bool
-runChecks env goalType prog =
-  and <$> mapM (\f -> f modules' funcSig body) checks
+runChecks :: MonadIO m => String -> String -> [String] -> FilterTest m Bool
+runChecks body funcSig modules =
+  and <$> mapM (\f -> f modules funcSig body) checks
   where
-    (modules, funcSig, body, _) = extractSolution env goalType prog
-    modules' = filter (/= "Symbol") modules -- Symbol is only for generating the database
     checks = [ checkSolutionNotCrash
-             , checkDuplicates]
+             {-, checkDuplicates-}] -- FIXME checkDuplicates always gives errors...
 
 checkSolutionNotCrash :: MonadIO m => [String] -> String -> String -> FilterTest m Bool
 checkSolutionNotCrash modules sigStr body = liftIO executeCheck
