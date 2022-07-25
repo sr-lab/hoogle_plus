@@ -25,10 +25,11 @@ import Debug.Trace (trace)
 
 symbolsInfo :: [(String, String)]
 symbolsInfo = [
-  ("symbolInt", "Int"),
-  ("symbolList", "[a]"),
-  ("symbolMaybe", "Maybe a"),
-  ("symbolEither", "Either a b")
+  ("symbolGen", "a")
+  --("symbolInt", "Int"),
+  --("symbolList", "[Int]")--,
+  --("symbolMaybe", "Maybe a"),
+  --("symbolEither", "Either a b")
   ]
 
 symbolModule :: String
@@ -84,7 +85,7 @@ parseExample str = case parse expr "" str of
                          , reservedNames = []}
 
     expr :: Parser Expr
-    expr = try pair <|> dataConstr <|> nat <|> list <|> parens lexer expr
+    expr = try pair <|> dataConstr <|> nat <|> list <|> parens lexer expr <|> wildcard
 
     -- expression that does not need parens
     insideExpr :: Parser Expr
@@ -95,6 +96,9 @@ parseExample str = case parse expr "" str of
 
     nat :: Parser Expr
     nat = do str <- many1 digit; return $ intToNat (read str)
+
+    wildcard :: Parser Expr
+    wildcard = char '_' >> return WildCard
 
     list :: Parser Expr
     list = do

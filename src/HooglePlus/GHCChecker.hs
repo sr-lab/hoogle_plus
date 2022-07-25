@@ -18,6 +18,7 @@ import HooglePlus.Example
 
 import Control.Exception
 import Control.Monad.Trans
+import Control.Monad (when)
 import CorePrep
 import CoreSyn
 import Data.Data
@@ -177,9 +178,7 @@ check_ goal searchParams solverChan checkerChan example = do
                         Nothing -> do
                             liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match."
                             return Nothing
-                else do
-                    liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by GHC."
-                    return Nothing
+                else return Nothing
 
 -- validate type signiture, run demand analysis, and run filter test
 -- checks the end result type checks; all arguments are used; and that the program will not immediately fail
@@ -204,15 +203,23 @@ runGhcChecks params env goalType prog  = let
     in do
         typeCheckResult <- if disableDemand then return (Right True) else liftIO $ runInterpreter $ checkType expr modules'
         case typeCheckResult of
-            Left err -> liftIO $ hPutStrLn stderr (displayException err) >> return False
-            Right False -> liftIO $ putStrLn "Program does not typecheck" >> return False
+            Left err -> do 
+                liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by GHC: type check."
+                liftIO $ hPutStrLn stderr (displayException err) 
+                return False
+            Right False -> do
+                liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by GHC: type check."
+                liftIO $ putStrLn "Program does not typecheck" 
+                return False
             Right True -> do
                 strictCheckResult <- if disableDemand then return True else liftIO $ checkStrictness tyclassCount symbolCount body' funcSig' modules'
                 if strictCheckResult 
                     then do 
                         filterCheckResult <- if disableFilter then return True else runChecks body' funcSig' modules'
+                        when (not filterCheckResult) $ liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by GHC: filter check."
                         return filterCheckResult
-                    else
+                    else do
+                        liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by GHC: dependency analysis."
                         return False
 
     where

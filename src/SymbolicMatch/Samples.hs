@@ -878,13 +878,13 @@ functionsInfo =
     -- Data.Either
     (-58, leftF, "Data.Either.Left"),
     (-59, rightF, "Data.Either.Right"),
-    (leftsN, leftsF, "Data.Maybe.lefts"),
-    (rightsN, rightsF, "Data.Maybe.rights"),
+    (leftsN, leftsF, "Data.Either.lefts"),
+    (rightsN, rightsF, "Data.Either.rights"),
     (-29, fromLeftF, "Data.Either.fromLeft"),
     (-30, fromRightF, "Data.Either.fromRight"),
     (-31, isLeftF, "Data.Either.isLeft"),
-    (-32, isRightF, "Data.Maybe.isRight"),
-    (-33, partitionEithersF, "Data.Maybe.partitionEithers"),
+    (-32, isRightF, "Data.Either.isRight"),
+    (-33, partitionEithersF, "Data.Either.partitionEithers"),
     -- either
 
     -- Data.Bool
