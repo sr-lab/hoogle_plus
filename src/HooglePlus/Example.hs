@@ -130,7 +130,7 @@ programToExpr prog example argsNames = let
     (prog', programToExpr' prog' example)
   where 
     -- changes the names of the symbols (Symbol.symbol...) to S0, S1, ...
-    -- to allow having more than on symbol per type
+    -- to allow having more than one symbol per type
     assignSyms :: UProgram -> Int -> (UProgram, Int)
     assignSyms prog nextSym = case content prog of
       (PSymbol id)
