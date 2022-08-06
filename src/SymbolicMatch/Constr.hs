@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 module SymbolicMatch.Constr
-    ( ConstrSet, SymbolicMatch.Constr.init, assign, appAssign, getAssign, buildFromConstr, pretty
+    ( ConstrSet, SymbolicMatch.Constr.init, assign, appAssign, getAssign, buildFromConstr, pretty, prettyAll
     ) where
 
 import SymbolicMatch.Expr ( Expr(Lit, Sym, DataC, WildCard), symbols )
@@ -67,6 +67,19 @@ pretty e cs@ConstrSet{symAsgns=sa, appAsgns=aa} = sort $ catMaybes $
     prettyAppAsgn ((name, es'), e')
       | name `elem` syms = Just (name, es', buildFromConstr cs e')
       | otherwise = Nothing
+
+-- presents all symbols, not only the one present on a specified expression
+prettyAll :: ConstrSet -> [(Int, [Expr], Expr)]
+prettyAll cs@ConstrSet{symAsgns=sa, appAsgns=aa} = sort $ catMaybes $
+    map prettySymAsgn (M.assocs sa)
+    ++
+    map prettyAppAsgn (M2.assocs aa)
+  where
+    prettySymAsgn :: (Int, Expr) -> Maybe (Int, [Expr], Expr)
+    prettySymAsgn (name, e') = Just (name, [], buildFromConstr cs e')
+
+    prettyAppAsgn :: ((Int, [Expr]), Expr) -> Maybe (Int, [Expr], Expr)
+    prettyAppAsgn ((name, es'), e') = Just (name, es', buildFromConstr cs e')
 
 -- a weaker version of match for final version expressions
 -- FIXME think about using match instead of this

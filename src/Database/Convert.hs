@@ -40,6 +40,7 @@ import Types.Program (BareDeclaration, Declaration, BareProgram(..), UProgram, P
 import Types.Type
 import qualified Types.Program as TP
 import qualified Data.Text as Text
+import Types.Filtering (FunctionSignature)
 
 prependName prefix name  = case name of
     Ident l var -> Ident l (prefix ++ "." ++ var)
@@ -393,7 +394,7 @@ renameSigs renameFunc currModule (decl:decls) = case decl of
       in Map.insertWith (++) currModule [EDecl (TypeSig loc newNames ty)] (renameSigs renameFunc currModule decls)
     _ -> Map.insertWith (++) currModule [decl] (renameSigs renameFunc currModule decls)
 
-readDeclarations :: PkgName -> Maybe Version -> IO (Map Id [Entry])
+readDeclarations :: PkgName -> Maybe Version -> IO (Map MdlName [Entry])
 readDeclarations pkg version = do
     downloadDir <- getTmpDir
     vpkg <-
@@ -411,10 +412,11 @@ readDeclarationsFromFile fp renameFunc = do
     let fileLines = lines s
     return $ readDeclarationsFromStrings fileLines renameFunc
 
-readDeclarationsFromStrings :: [String] -> Bool -> Map MdlName [Entry]
+readDeclarationsFromStrings :: [String] -> Bool -> (Map MdlName [Entry])
 readDeclarationsFromStrings lines renameFunc =
     let code = concat $ rights $ map parseLine lines in
         renameSigs renameFunc "" code
+            
 
 packageDependencies :: PkgName -> Bool -> IO [PkgName]
 packageDependencies pkg toDownload = do

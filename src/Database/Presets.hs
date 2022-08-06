@@ -36,5 +36,6 @@ myModules = [
   "Data.Function",
   -- ByteString
   "Data.ByteString.Lazy",
-  "Data.ByteString.Builder"
+  "Data.ByteString.Builder",
+  "GHC.Num"
   ] -- module Symbol is included only for generating the database

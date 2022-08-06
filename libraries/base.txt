@@ -62,12 +62,16 @@ Just :: a -> Maybe a
 maybe :: b -> (a -> b) -> Maybe a -> b
 isJust :: Maybe a -> Bool
 isNothing :: Maybe a -> Bool
-fromJust :: Maybe a -> a
-fromMaybe :: a -> Maybe a -> a
+--fromJust :: Maybe a -> a
+--fromMaybe :: a -> Maybe a -> a
 listToMaybe :: [a] -> Maybe a
 maybeToList :: Maybe a -> [a]
 catMaybes :: [Maybe a] -> [a]
-mapMaybe :: (a -> Maybe b) -> [a] -> [b]
+--mapMaybe :: (a -> Maybe b) -> [a] -> [b]
+module GHC.Num
+(+) :: Num a => a -> a -> a
+(-) :: Num a => a -> a -> a
+(*) :: Num a => a -> a -> a
 module GHC.List
 map :: (a -> b) -> [a] -> [b]
 (++) :: [a] -> [a] -> [a]
@@ -88,12 +92,12 @@ foldl' :: forall a b. (b -> a -> b) -> b -> [a] -> b
 foldl1 :: (a -> a -> a) -> [a] -> a
 foldl1' :: (a -> a -> a) -> [a] -> a
 scanl :: (b -> a -> b) -> b -> [a] -> [b]
-scanl1 :: (a -> a -> a) -> [a] -> [a]
+--scanl1 :: (a -> a -> a) -> [a] -> [a]
 scanl' :: (b -> a -> b) -> b -> [a] -> [b]
 foldr :: (a -> b -> b) -> b -> [a] -> b
 foldr1 :: (a -> a -> a) -> [a] -> a
 scanr :: (a -> b -> b) -> b -> [a] -> [b]
-scanr1 :: (a -> a -> a) -> [a] -> [a]
+--scanr1 :: (a -> a -> a) -> [a] -> [a]
 --iterate :: (a -> a) -> a -> [a]
 --iterate' :: (a -> a) -> a -> [a]
 --repeat :: a -> [a]
@@ -106,8 +110,8 @@ product :: Num a => [a] -> a
 maximum :: Ord a => [a] -> a
 minimum :: Ord a => [a] -> a
 splitAt :: Int -> [a] -> ([a], [a])
-takeWhile :: (a -> Bool) -> [a] -> [a]
-dropWhile :: (a -> Bool) -> [a] -> [a]
+--takeWhile :: (a -> Bool) -> [a] -> [a]
+--dropWhile :: (a -> Bool) -> [a] -> [a]
 span :: (a -> Bool) -> [a] -> ([a], [a])
 break :: (a -> Bool) -> [a] -> ([a], [a])
 reverse :: [a] -> [a]
@@ -120,7 +124,7 @@ infix 4 `elem`
 notElem :: Eq a => a -> [a] -> Bool
 infix 4 `notElem`
 lookup :: Eq a => a -> [(a, b)] -> Maybe b
-concatMap :: (a -> [b]) -> [a] -> [b]
+--concatMap :: (a -> [b]) -> [a] -> [b]
 zip :: [a] -> [b] -> [(a, b)]
 zip3 :: [a] -> [b] -> [c] -> [(a, b, c)]
 zipWith :: (a -> b -> c) -> [a] -> [b] -> [c]
@@ -971,8 +975,8 @@ lefts :: [Either a b] -> [a]
 rights :: [Either a b] -> [b]
 isLeft :: Either a b -> Bool
 isRight :: Either a b -> Bool
-fromLeft :: a -> Either a b -> a
-fromRight :: b -> Either a b -> b
+--fromLeft :: a -> Either a b -> a
+--fromRight :: b -> Either a b -> b
 partitionEithers :: [Either a b] -> ([a], [b])
 instance (GHC.Show.Show a, GHC.Show.Show b) => GHC.Show.Show (Data.Either.Either a b)
 instance (GHC.Read.Read a, GHC.Read.Read b) => GHC.Read.Read (Data.Either.Either a b)

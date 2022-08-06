@@ -10,6 +10,7 @@ import qualified Data.Set as Set
 import Data.Set (Set)
 import qualified Data.Map as Map
 import Data.Map (Map)
+import Types.Filtering (FunctionSignature)
 
 import Control.Lens
 
@@ -37,7 +38,8 @@ data Environment = Environment {
   _included_modules :: Set String,          -- ^ The set of modules any solution would need to import
   _typClassInstances :: [(String, String)],
   _condTypClasses :: [([(String, [Set String])], (String, String))],
-  _hoCandidates :: [Id]
+  _hoCandidates :: [Id],
+  _symsToLinearSynth :: [(String, FunctionSignature, Int)]
   } deriving(Generic)
 
 makeLenses ''Environment
@@ -63,5 +65,6 @@ emptyEnv = Environment {
   _included_modules = Set.empty,
   _typClassInstances = [],
   _condTypClasses = [],
-  _hoCandidates = []
+  _hoCandidates = [],
+  _symsToLinearSynth = []
 }

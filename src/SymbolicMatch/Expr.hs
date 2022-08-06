@@ -64,6 +64,17 @@ symbols (Lam _ e) = symbols e
 symbols (Case e alts) = symbols e ++ concatMap (\(Alt _ _ e) -> symbols e) alts
 symbols (Var _) = []
 
+-- | returns the list of the names of variables in the AST
+variables :: Expr -> [Int]
+variables (Sym _) = []
+variables (DataC _ es) = concatMap variables es
+variables (App e es) = variables e ++ concatMap variables es
+variables WildCard = []
+variables (Lit _) = []
+variables (Lam _ e) = variables e
+variables (Case e alts) = variables e ++ concatMap (\(Alt _ _ e) -> variables e) alts
+variables (Var n) = [n]
+
 -- | returns True iff the expression is final
 final :: Expr -> Bool
 final (Sym _) = True
@@ -89,6 +100,9 @@ replace expr src dst
       App ex exs -> App (replace ex src dst) (map (\e -> replace e src dst) exs)
       Case ex alts -> Case (replace ex src dst) (map (\(Alt s ss e)->Alt s ss (replace e src dst)) alts)
       WildCard -> expr
+
+replaceAll :: Expr -> [(Expr, Expr)] -> Expr
+replaceAll e rpl = foldr (\(s,d) r -> replace r s d) e rpl
 
 needsPar :: Expr -> Bool
 needsPar (Lit _) = False
@@ -121,7 +135,7 @@ showExpr env d@(DataC n es) = case n of
     showCons :: [(Int, String)] -> Expr -> Expr -> String
     showCons env hd tl = case tl of
       (DataC "Nil" []) -> showExpr env hd
-      WildCard -> showExpr env hd ++ ", ..."
+      WildCard -> showExpr env hd {- ++ ", ..." -} -- despite being useful, it does not suit the compilation in GHC...
       (DataC "Cons" args)
         | length args == 2 -> showExpr env hd ++ ", " ++ showCons env (args !! 0) (args !! 1)
         | otherwise -> error "showCons"

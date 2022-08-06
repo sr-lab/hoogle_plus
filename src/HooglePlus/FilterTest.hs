@@ -34,7 +34,10 @@ parseTypeString :: String -> FunctionSignature
 parseTypeString input = FunctionSignature constraints argsType returnType
   where
     (constraints, argsType, returnType) = buildSig [] [] value
-    (ParseOk value) = parseType input
+    {-(ParseOk value) = parseType input-}
+    value = case parseType input of 
+      ParseOk v -> v
+      e -> error $ "parseType failed for input " ++ show input
 
     buildSig constraints argList (TyForall _ _ (Just ctx) t) = buildSig constraints' argList t
       where constraints' = constraints ++ extractConstraints constraints ctx

@@ -27,7 +27,7 @@ symbolsInfo :: [(String, String)]
 symbolsInfo = [
   ("symbolGen", "a")
   --("symbolInt", "Int"),
-  --("symbolList", "[Int]")--,
+  --("symbolListInt", "[Int]")--,
   --("symbolMaybe", "Maybe a"),
   --("symbolEither", "Either a b")
   ]
@@ -129,7 +129,7 @@ programToExpr prog example argsNames = let
   prog' = fst $ assignSyms prog 0 in
     (prog', programToExpr' prog' example)
   where 
-    -- changes the names of the symbols (Symbol.symbol...) to S0, S1, ...
+    -- changes the names of the symbols (Symbol.symbol...) to Sym0, Sym1, ...
     -- to allow having more than one symbol per type
     assignSyms :: UProgram -> Int -> (UProgram, Int)
     assignSyms prog nextSym = case content prog of

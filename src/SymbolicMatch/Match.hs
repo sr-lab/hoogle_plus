@@ -2,7 +2,7 @@
 
 
 module SymbolicMatch.Match
-    ( matchExprs, matchExprsPretty, MatchError(..))
+    ( matchExprs, matchExprsPretty, matchPairsPretty, MatchError(..))
      where
 
 import Data.List ( sort )
@@ -12,7 +12,7 @@ import qualified SymbolicMatch.Constr as C
 import qualified SymbolicMatch.State as S
 import qualified SymbolicMatch.Env as E
 import SymbolicMatch.Eval ( eval )
-import SymbolicMatch.Constr (pretty)
+import SymbolicMatch.Constr (pretty, prettyAll)
 
 data MatchError = DepthReached
                 | Mismatch
@@ -163,3 +163,10 @@ matchExprs depth e1 env dst =
 matchExprsPretty :: Int -> Expr -> E.Env ->  Expr -> Either MatchError [(Int, [Expr], Expr)]
 matchExprsPretty depth e1 env dst = 
   match e1 (S.init env depth) dst idCont >>= \cs -> Right $ pretty e1 cs
+
+matchPairsPretty :: Int 
+                 -> [(Expr, Expr)] 
+                 -> E.Env 
+                 -> Either MatchError [(Int, [Expr], Expr)]
+matchPairsPretty depth src env =
+  matchPairs src (S.init env depth) idCont >>= \cs -> Right $ prettyAll cs

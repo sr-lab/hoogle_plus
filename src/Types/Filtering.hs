@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 module Types.Filtering where
 
 import Control.Exception
@@ -5,6 +6,8 @@ import Control.Monad.State
 import Data.Typeable
 import Text.Printf
 import Data.List (intercalate)
+import Data.Serialize
+import GHC.Generics hiding (to)
 
 defaultTimeoutMicro = 5 * 10^4 :: Int
 defaultInterpreterTimeoutMicro = 60 * 10^6 :: Int
@@ -38,7 +41,9 @@ data ArgumentType =
   | ArgTypeTuple [ArgumentType]
   | ArgTypeApp  ArgumentType ArgumentType
   | ArgTypeFunc ArgumentType ArgumentType
-  deriving (Eq)
+  deriving (Eq, Generic)
+
+instance Serialize ArgumentType
 
 instance Show ArgumentType where
   show (Concrete    name) = name
@@ -55,6 +60,9 @@ newtype NotSupportedException = NotSupportedException String
 instance Exception NotSupportedException
 
 data TypeConstraint = TypeConstraint String String
+  deriving (Generic)
+
+instance Serialize TypeConstraint
 
 instance Show TypeConstraint where
   show (TypeConstraint name constraint) = printf "%s %s" constraint name
@@ -63,7 +71,9 @@ data FunctionSignature =
   FunctionSignature { _constraints :: [TypeConstraint]
                     , _argsType :: [ArgumentType]
                     , _returnType :: ArgumentType
-  }
+  } deriving (Generic)
+
+instance Serialize FunctionSignature
 
 instance Show FunctionSignature where
   show (FunctionSignature constraints argsType returnType) =

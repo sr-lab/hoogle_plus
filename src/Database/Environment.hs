@@ -5,6 +5,7 @@ module Database.Environment(
   , toFunType
   , getFiles
   , filesToEntries
+  , filesToLinearSynthSymbs
   ) where
 
 import Data.Either
@@ -38,8 +39,15 @@ import Synquid.Util
 import qualified Debug.Trace as D
 
 import qualified HooglePlus.Example as Example
+import qualified SymbolicMatch.Samples as S
 
 import Debug.Trace (trace)
+import Data.Typeable (typeOf)
+import Control.Monad.IO.Class (liftIO)
+import Types.Filtering (FunctionSignature)
+import qualified Data.Text as T
+import HooglePlus.FilterTest (parseTypeString)
+import System.IO
 
 writeEnv :: FilePath -> Environment -> IO ()
 writeEnv path env = B.writeFile path (encode env)
@@ -68,6 +76,7 @@ generateEnv genOpts = do
     let mbModuleNames = if length mdls > 0 then Just ("Symbol":mdls) else Nothing
     pkgFiles <- getFiles pkgOpts
     allEntriesByMdl <- filesToEntries pkgFiles True
+    symsToLS <- filesToLinearSynthSymbs pkgFiles mdls
     DD.cleanTmpFiles pkgOpts pkgFiles
     let entriesByMdl = filterEntries allEntriesByMdl mbModuleNames
     let ourEntries = nubOrd $ concat $ Map.elems entriesByMdl
@@ -76,7 +85,6 @@ generateEnv genOpts = do
     let allCompleteEntries = concat (Map.elems entriesByMdl)
     let allEntries = nubOrd allCompleteEntries
     ourDecls <- mapM (\(entry) -> (evalStateT (DC.toSynquidDecl entry) 0)) allEntries
-
     let instanceDecls = filter (\entry -> DC.isInstance entry) allEntries
     let instanceRules = map DC.getInstanceRule instanceDecls
     let transitionIds = [0 .. length instanceRules]
@@ -90,7 +98,6 @@ generateEnv genOpts = do
     let removeParentheses = (\x -> LUtils.replace ")" "" $ LUtils.replace "(" "" x)
     let tcNames = nub $ map removeParentheses $ filter (\x -> isInfixOf tyclassPrefix x) (splitOn " " declStrs)
     let tcDecls = map (\x -> Pos (initialPos "") $ TP.DataDecl x ["a"] [] []) tcNames
-
     let library = concat [ourDecls, dependencyEntries, instanceFunctions', tcDecls, defaultLibrary]
     let hooglePlusDecls = DC.reorderDecls $ nubOrd $ library
 
@@ -108,7 +115,8 @@ generateEnv genOpts = do
             -- transform into fun types and add into the environments
             let sigs' = zipWith (\n t -> (n ++ hoPostfix, toFunType t)) hofNames sigs
             let env'' = env' { _symbols = Map.union (env' ^. symbols) (Map.fromList sigs')
-                             , _hoCandidates = map fst sigs' }
+                             , _hoCandidates = map fst sigs'
+                             , _symsToLinearSynth = symsToLS }
             return env''
     printStats result
     return result
@@ -134,6 +142,59 @@ filesToEntries fps renameFunc = do
     let symbolModule = DC.readDeclarationsFromStrings Example.symbolsDecls renameFunc
     return $ Map.unionsWith (++) (symbolModule:declsByModuleByFile)
 
+filesToLinearSynthSymbs :: [FilePath] -> [String] -> IO [(String, FunctionSignature, Int)]
+filesToLinearSynthSymbs fps modules = foldr (\fp r -> do r' <- r; c <- readFileToLS fp; return $ c ++ r') (return []) fps
+  where 
+    modulesText :: [T.Text]
+    modulesText = map T.pack modules
+
+    readFileToLS :: FilePath -> IO [(String, FunctionSignature, Int)]
+    readFileToLS fp = do 
+      h <- openFile fp ReadMode
+      hSetEncoding h utf8
+      s <- hGetContents h
+      return $ parseLines (T.lines $ T.pack s) (T.pack "") False []
+      where 
+        parseLines :: [T.Text] 
+                   -> T.Text
+                   -> Bool -- whether the current module is to consider or not
+                   -> [(String, FunctionSignature, Int)]
+                   -> [(String, FunctionSignature, Int)]
+        parseLines [] _ modOk acc = acc
+        parseLines (h:t) curMod modOk acc
+          -- current line is a module declaration
+          | Just mod <- T.stripPrefix (T.pack "module ") (T.strip h) =
+            let str = T.strip mod in
+              if T.null str 
+                then error "parse file LS" 
+                else parseLines t str (str `elem` modulesText) acc
+          -- current line is to ignore; no definition os function nor module
+          | T.pack "@" `T.isPrefixOf` (T.strip h) = parseLines t curMod modOk acc
+          | T.pack "data " `T.isPrefixOf` (T.strip h) = parseLines t curMod modOk acc
+          | T.pack "instance " `T.isPrefixOf` (T.strip h) = parseLines t curMod modOk acc
+          | T.pack "class " `T.isPrefixOf` (T.strip h) = parseLines t curMod modOk acc
+          | T.pack "infix " `T.isPrefixOf` (T.strip h) = parseLines t curMod modOk acc
+          | T.pack "infixr " `T.isPrefixOf` (T.strip h) = parseLines t curMod modOk acc
+          | T.pack "infixl " `T.isPrefixOf` (T.strip h) = parseLines t curMod modOk acc
+          | T.pack "type " `T.isPrefixOf` (T.strip h) = parseLines t curMod modOk acc
+          | T.pack "--" `T.isPrefixOf` (T.strip h) = parseLines t curMod modOk acc
+          -- current line is a declaration id :: type, but ignore because 
+          -- that modules is not to consider
+          | not modOk = parseLines t curMod modOk acc
+          -- current line is a declaration id :: type, and the modules is to consider
+          | otherwise = let decl = T.splitOn (T.pack "::") h in
+            if length decl < 2 then error $ "parse file LS: " ++ show h else
+              let nm = T.unpack $ T.strip (decl !! 0) 
+                  ty = T.unpack $ T.unwords $ map (T.strip) (tail decl) in
+                if null nm || null ty 
+                  then error $ printf "name or type empty in %s" h
+                  else 
+                    let nmMod = if head nm == '('
+                        then '(' : ((T.unpack curMod) ++ "." ++ (tail nm)) 
+                        else (T.unpack curMod) ++ "." ++ nm 
+                      in case S.lookupFun nmMod of -- FIXME (2 things):trace should be error? reject h.o.
+                        Nothing -> trace (printf "Function not in match: %s" (show nmMod)) $ parseLines t curMod modOk acc
+                        Just i -> parseLines t curMod modOk ((nmMod, parseTypeString ty , i):acc)
 
 getFiles :: PackageFetchOpts -> IO [FilePath]
 getFiles Hackage{packages=p} = mapM DD.getPkg p >>= (return . concat)

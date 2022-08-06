@@ -902,16 +902,17 @@ functionsInfo =
     (-39, swapF, "Data.Tuple.swap"),
     -- curry, uncurry
 
-    -- Prelude
-    (-43, subF, "(-)"),
-    (-44, mulF, "(*)"),
+    -- GHC.Num
+    (-43, subF, "(GHC.Num.-)"),
+    (-44, mulF, "(GHC.Num.*)"),
+    (-11, addF, "(GHC.Num.+)"),
+
     (-49, lteF, "(<=)"),
     (-50, ltF, "<"),
     (-51, maxF, "max"),
     (-52, minF, "min"),
     (-3, idF, "id"),
     (-7, reverseIterF, "reverse-iter"),
-    (-11, addF, "(+)"),
     (-13, oddF, "odd")
   ]
 

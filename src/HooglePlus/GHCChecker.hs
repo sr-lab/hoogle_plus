@@ -8,6 +8,7 @@ import Types.Program
 import Types.Type
 import Types.Experiments
 import Types.Filtering
+import qualified Types.Common as TC (Id)
 import Synquid.Type
 import Synquid.Util hiding (fromRight)
 import Synquid.Pretty as Pretty
@@ -58,6 +59,7 @@ import qualified SymbolicMatch.State as State (init)
 import qualified SymbolicMatch.Match as Match (matchExprsPretty, MatchError(..))
 import qualified Data.Bool (bool)
 import System.IO (stderr, hPutStrLn)
+import HooglePlus.LinearSynth (linearSynth)
 
 showGhc :: (Outputable a) => a -> String
 showGhc = showPpr unsafeGlobalDynFlags
@@ -68,9 +70,8 @@ checkStrictness' :: Int -> String -> String -> [String] -> IO Bool
 checkStrictness' tyclassCount  lambdaExpr typeExpr modules = GHC.runGhc (Just libdir) $ do
     tmpDir <- liftIO $ getTmpDir
     -- TODO: can we use GHC to dynamically compile strings? I think not
-    let modules' = filter (/= "Symbol") modules
     let toModuleImportStr = (printf "import %s\n") :: String -> String
-    let moduleImports = concatMap toModuleImportStr modules'
+    let moduleImports = concatMap toModuleImportStr modules
     let sourceCode = printf "module Temp where\n%s\n%s :: %s\n%s = %s\n" moduleImports ourFunctionName typeExpr ourFunctionName lambdaExpr
     baseName <- liftIO $ nextRandom
     let baseNameStr = show baseName ++ ".hs"
@@ -152,11 +153,11 @@ check_ goal searchParams solverChan checkerChan example = do
         handleMessages solverChan checkChan msg =
             case msg of
                 (MesgP (program, stats, _)) -> do
-                    checkResult <- executeCheck program
+                    -- executeCheck can return several programs given one 
+                    -- program from the petri net (different lambdas)
+                    progs <- executeCheck program
                     state <- get
-                    case checkResult of
-                        Just program' -> (bypass (MesgP (program', stats, state))) >> next 
-                        Nothing -> next
+                    foldr (\c r -> bypass (MesgP (c, stats, state)) >> r) next progs
                 (MesgClose _) -> bypass msg
                 _ -> (bypass msg) >> next
 
@@ -170,15 +171,15 @@ check_ goal searchParams solverChan checkerChan example = do
             ghcChecks <- runGhcChecks searchParams env destType prog
             if ghcChecks 
                 then do
-                    exampleChecks <- return $ Just prog -- runExampleChecks searchParams env destType prog example
-                    case exampleChecks of 
-                        Just prog' -> do
-                            liftIO $ putStrLn $ "Test \'" ++ show prog' ++ "\': accepted."
-                            return exampleChecks
-                        Nothing -> do
+                    progs <- runExampleChecks searchParams env destType prog example
+                    case progs of -- TODO refactor
+                        _:_ -> do
+                            liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': accepted - origin of : " ++ show (length progs) ++ " solutions"
+                            return progs
+                        []  -> do
                             liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match."
-                            return Nothing
-                else return Nothing
+                            return []
+                else return []
 
 -- validate type signiture, run demand analysis, and run filter test
 -- checks the end result type checks; all arguments are used; and that the program will not immediately fail
@@ -254,18 +255,36 @@ runGhcChecks params env goalType prog  = let
                 args' = map removeProgModulePrefix args in
                     p {content = PApp id' args'}
 
--- run the match algorithm against an example and return a new program with the symbols replaced
-runExampleChecks :: MonadIO m => SearchParams -> Environment -> RType -> UProgram -> Example -> FilterTest m (Maybe UProgram)
+-- run the match algorithm against an example and return
+-- a new program with the symbols replaced
+runExampleChecks :: MonadIO m 
+                 => SearchParams 
+                 -> Environment 
+                 -> RType 
+                 -> UProgram 
+                 -> Example 
+                 -> FilterTest m [UProgram]
 runExampleChecks params env goalType prog example = do 
-    let (_, _, body, argList) = extractSolution env goalType prog
+    let (modules, funcSig, _, argList) = extractSolution env goalType prog
     let argsNames = map fst argList
     let progWithoutTc = removeTc prog
     let (prog', expr) = programToExpr progWithoutTc example argsNames
-    case trace ("Call Match: expr = " ++ Expr.showExpr functionsNames expr ++ ", dst = " ++ Expr.showExpr functionsNames (output example)) $ Match.matchExprsPretty 150 expr functionsEnv (output example) of
+    let modules' = filter (/= "Symbol") modules 
+    case Match.matchExprsPretty 150 expr functionsEnv (output example) of
         Left err
-            | Match.Exception msg <- err -> liftIO (putStrLn $ "match: " ++ msg) >> return Nothing
-            | otherwise -> return Nothing
-        Right cs -> return $ Just $ replaceSymsInProg cs prog'
+            | Match.Exception msg <- err -> liftIO (putStrLn $ "match: " ++ msg) >> return []
+            | otherwise -> return []
+        Right cs -> do -- TODO refactor; a single replace call;
+            -- replace all non-function symbols built by match
+            let prog'' = replaceSymsInProg cs prog'
+            -- get each symbol types
+            let (_, _, lambda, _) = extractSolution env goalType prog''
+            sts <- getSymbolsTypes lambda modules' funcSig
+            -- synthesize lambdas for the function symbols and replace
+            -- FIXME it should skip the non function
+            case synthLambdas (_symsToLinearSynth env) sts argList cs of
+                [] -> trace (printf "synthLams went wrong: %s %s" (show sts) (show prog') ) $ return []
+                lams@(_:_) -> return [replaceLamsInProg l prog'' | l <- lams]
     where
         -- The symbols in prog are replaced by the result of match
         -- also, when arguments of functions are @@ (typeclass instances)
@@ -276,7 +295,7 @@ runExampleChecks params env goalType prog example = do
                     symInd = read (drop (length "Sym") id) :: Int
                     repl = lookup symInd cs' in
                         case repl of
-                            Nothing -> error $ "Symbol " ++ id ++ " is not assigned in cs."
+                            Nothing -> prog -- it should be a function
                             Just repl'
                                 | Expr.needsPar repl' -> prog {content = PSymbol $ "(" ++ Expr.showExpr functionsNames repl' ++ ")"}
                                 | otherwise -> prog {content = PSymbol $ Expr.showExpr functionsNames repl'}
@@ -284,8 +303,22 @@ runExampleChecks params env goalType prog example = do
             PApp id args -> prog {content = PApp id (map (replaceSymsInProg cs) args)}
             _ -> error "Solution not expexted to have other than PSym and PApp."
             where
-                cs' = map (\(a, _, b) -> (a, b)) cs -- we do not have functions here, so do not need args
+                -- we only want to replace non functions values
+                cs' = mapMaybe (\(s, as, v) -> case as of {[] -> Just (s, v); _:_ -> Nothing}) cs
         
+        -- replace lambdas synthesized by linearSynth
+        replaceLamsInProg :: [(Int, String)] -> UProgram -> UProgram
+        replaceLamsInProg lams prog = case content prog of
+            PSymbol id 
+                | "Sym" `isPrefixOf` id ->  let
+                    symInd = read (drop (length "Sym") id) :: Int in
+                    case lookup symInd lams of
+                        Nothing -> error $ "Symbol " ++ id ++ " is not assigned in lambdas."
+                        Just lam -> prog {content = PSymbol $ lam}
+                | otherwise -> prog
+            PApp id args -> prog {content = PApp id (map (replaceLamsInProg lams) args)}
+            _ -> error "Solution not expexted to have other than PSym and PApp."
+
         removeTc :: UProgram -> UProgram
         removeTc p = case content p of
             PSymbol _ -> p
@@ -299,6 +332,59 @@ runExampleChecks params env goalType prog example = do
                         | otherwise -> False
                     _ -> False
 
+        getSymbolsTypes :: MonadIO m 
+                        => String          -- a program whose symbols names are Sym<n>
+                        -> [String]        -- modules
+                        -> String          -- goal type
+                        -> FilterTest m [(Int, String)] -- for each symbol, a pair with index and type
+        getSymbolsTypes lambda modules funcSig = do 
+            let lambda' = Text.unpack $ Text.replace (Text.pack "Sym") (Text.pack "_Sym") (Text.pack lambda)
+            let expr = lambda' ++ " :: " ++ funcSig
+            liftIO $ putStrLn $ "Check hole: " ++ expr
+            res <- liftIO $ runInterpreter $ checkType expr modules
+            case res of 
+                Left err -> case err of
+                    WontCompile msgs -> return $ map extractType msgs
+                    _ -> error "getSymbolsTypes: Expected error message to be WontCompile"
+                Right _ -> return [] 
+            where 
+                -- extracts the hole type from the "found hole" message
+                extractType :: GhcError -> (Int, String)
+                extractType (GhcError msg) = let
+                    -- holeLine: Found hole: _Sym0 :: Int -> Int -> Int
+                    holeLine = (Text.lines $ Text.pack msg) !! 1 
+                    -- hole: _Sym0 :: Int -> Int -> Int
+                    hole = snd $ Text.break (== '_') holeLine
+                    -- symbolName: _Sym0
+                    symbolName = head $ Text.words hole
+                    -- symbolNum: 0
+                    symbolNum = read (Text.unpack $ Text.drop (length "_Sym") symbolName) :: Int
+                    -- symbolType: Int -> Int -> Int
+                    symbolType = Text.unwords $ drop 2 $ Text.words hole in
+                        (symbolNum, Text.unpack symbolType)
+
+        synthLambdas :: [(String, FunctionSignature, Int)]
+                     -> [(Int, String)] 
+                     -> [(TC.Id, RSchema)] 
+                     -> [(Int, [Expr.Expr], Expr.Expr)]
+                     -> [[(Int, String)]]
+        synthLambdas env sts argsList cs = --foldr foldFun (Just []) sts
+            sequence $ map (\(si, st) -> 
+                [(si, lam) |lam <- linearSynth env st argsList example (exampSym si)]) sts
+            where
+                exampSym :: Int -> [([Expr.Expr], Expr.Expr)]
+                exampSym n = mapMaybe 
+                    (\(i, args, val) -> if i == n then Just (args, val) else Nothing)
+                    cs
+                
+
+                {-foldFun :: (Int, String)
+                        -> Maybe [(Int, String)] 
+                        -> Maybe [(Int, String)]
+                foldFun (si, st) r = do
+                    r' <- r
+                    lam <- linearSynth st argsList example (exampSym si)
+                    return $ (si,lam):r'-}
 
 -- ensures that the program type-checks
 checkType :: String -> [String] -> Interpreter Bool
