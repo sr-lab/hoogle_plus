@@ -1,5 +1,4 @@
--- module HooglePlus.FilterTest (runChecks, checkSolutionNotCrash, checkDuplicates) where
-module HooglePlus.FilterTest where
+module HooglePlus.FilterTest (runChecks, checkSolutionNotCrash, checkDuplicates, parseTypeString) where
 
 import Language.Haskell.Interpreter hiding (get)
 import Language.Haskell.Interpreter.Unsafe
@@ -34,7 +33,6 @@ parseTypeString :: String -> FunctionSignature
 parseTypeString input = FunctionSignature constraints argsType returnType
   where
     (constraints, argsType, returnType) = buildSig [] [] value
-    {-(ParseOk value) = parseType input-}
     value = case parseType input of 
       ParseOk v -> v
       e -> error $ "parseType failed for input " ++ show input
@@ -204,7 +202,7 @@ runChecks body funcSig modules =
   and <$> mapM (\f -> f modules funcSig body) checks
   where
     checks = [ checkSolutionNotCrash
-             {-, checkDuplicates-}] -- FIXME checkDuplicates always gives errors...
+             , checkDuplicates]
 
 checkSolutionNotCrash :: MonadIO m => [String] -> String -> String -> FilterTest m Bool
 checkSolutionNotCrash modules sigStr body = liftIO executeCheck
@@ -270,5 +268,3 @@ toParamListDecl args =
           _ -> error "Unsupported higher-order function"
     
     toDecl (index, _) = formatParam index
-      
-      

@@ -116,7 +116,8 @@ generateEnv genOpts = do
             let sigs' = zipWith (\n t -> (n ++ hoPostfix, toFunType t)) hofNames sigs
             let env'' = env' { _symbols = Map.union (env' ^. symbols) (Map.fromList sigs')
                              , _hoCandidates = map fst sigs'
-                             , _symsToLinearSynth = symsToLS }
+                             , _symsToLinearSynth = symsToLS
+                             , _included_modules = Set.filter (/= "Symbol") $ _included_modules env' }
             return env''
     printStats result
     return result

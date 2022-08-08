@@ -116,33 +116,54 @@ needsPar (Case _ _) = True
 
 -- convert an expression to a String
 showExpr :: [(Int, String)] -> Expr -> String
-showExpr _ WildCard = "_"
-showExpr _ (Lam _ _) = error "Solutions not expected to have lambdas."
-showExpr env (Var n) = case lookup n env of
-  Nothing -> error "Variable id does not exist."
-  Just s -> s
-showExpr _ (Sym s) = '$':show s
-showExpr env d@(DataC n es) = case n of
-  "Nil" -> "[]"
-  "Cons"
-    | length es == 2 -> "[" ++ showCons env (es !! 0) (es !! 1) ++ "]"
-    | otherwise -> error "showExpr: Cons does not have 2 args"
-  "Z" -> "0"
-  "S" -> show $ natToInt d
-  "Pair" -> "(" ++ showExpr env (es !! 0) ++ ", " ++ showExpr env (es !! 1) ++ ")"
-  _ -> n ++ foldr (\c r-> ' ':(if needsPar c then "(" ++ showExpr env c ++ ")" else showExpr env c) ++ r) "" es
-  where 
-    showCons :: [(Int, String)] -> Expr -> Expr -> String
-    showCons env hd tl = case tl of
-      (DataC "Nil" []) -> showExpr env hd
-      WildCard -> showExpr env hd {- ++ ", ..." -} -- despite being useful, it does not suit the compilation in GHC...
+showExpr env e = fst $ showExpr' 0 e
+  where -- we print each wild card as a _n, where n is a new number for each
+    showExpr' :: Int -> Expr -> (String, Int)
+    showExpr' nextWild WildCard = ('_' : show nextWild, nextWild + 1)
+    showExpr' _ (Lam _ _) = error "Solutions not expected to have lambdas."
+    showExpr' nextWild (Var n) = case lookup n env of
+      Nothing -> error "Variable id does not exist."
+      Just s -> (s, nextWild)
+    showExpr' nextWild (Sym s) = ('$':show s, nextWild)
+    showExpr' nextWild d@(DataC n es) = case n of
+      "Nil" -> ("[]", nextWild)
+      "Cons"
+        | length es == 2 -> 
+            let (str, nWild) = showCons nextWild (es !! 0) (es !! 1) in 
+              ("[" ++ str ++ "]", nWild)
+        | otherwise -> error "showExpr: Cons does not have 2 args"
+      "Z" -> ("0", nextWild)
+      "S" -> (show $ natToInt d, nextWild)
+      "Pair" -> let (p1, n1) = showExpr' nextWild (es !! 0)
+                    (p2, n2) = showExpr' n1 (es !! 1) in
+          ("(" ++ p1 ++ ", " ++  p2 ++ ")", n2)
+      _ -> let (p, w) = showArgs nextWild es in (n ++ p, w)
+    showExpr' nextWild (App e es) = let 
+        (p1, n1) = showExpr' nextWild e
+        (p2, n2) = showArgs n1 es in
+        (p1 ++ p2, n2)
+    showExpr' nextWild (Lit l) = (show l, nextWild)
+    showExpr' _ (Case _ _) = error "Solutions not expected to have cases."
+
+    showCons :: Int -> Expr -> Expr -> (String, Int)
+    showCons nextWild hd tl = case tl of
+      (DataC "Nil" []) -> showExpr' nextWild hd
+      WildCard -> showExpr' nextWild hd {- ++ ", ..." -} -- despite being useful, it does not suit the compilation in GHC...
       (DataC "Cons" args)
-        | length args == 2 -> showExpr env hd ++ ", " ++ showCons env (args !! 0) (args !! 1)
+        | length args == 2 -> let
+            (p1, n1) = showExpr' nextWild hd
+            (p2, n2) = showCons n1 (args !! 0) (args !! 1) in
+          (p1 ++ ", " ++ p2, n2)
         | otherwise -> error "showCons"
-      _ -> error "showCons: not nil, cons, wildcard: (" ++ show tl ++ ")"
-showExpr env (App e es) = showExpr env e ++ foldr (\c r-> ' ':(if needsPar c then "(" ++ showExpr env c ++ ")" else showExpr env c) ++ r) "" es
-showExpr _ (Lit l) = show l
-showExpr _ (Case _ _) = error "Solutions not expected to have cases."
+      _ -> error $ "showCons: not nil, cons, wildcard: (" ++ show tl ++ ")"
+
+    showArgs :: Int -> [Expr] -> (String, Int)
+    showArgs nextWild [] = ("", nextWild)
+    showArgs nextWild (h:t) = let
+      (p1, n1) = showExpr' nextWild h
+      (p2, n2) = showArgs n1 t
+      p1' = if needsPar h then "(" ++ p1 ++ ")" else p1 
+      in (" " ++ p1' ++ p2, n2)
 
 -- replace the symbols of an expression
 replaceSyms :: [(Int, [Expr], Expr)] -> Expr -> Expr

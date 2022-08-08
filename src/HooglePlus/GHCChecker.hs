@@ -14,7 +14,7 @@ import Synquid.Util hiding (fromRight)
 import Synquid.Pretty as Pretty
 import Database.Util
 import HooglePlus.Utils
-import HooglePlus.FilterTest (runChecks)
+import HooglePlus.FilterTest (runChecks, parseTypeString)
 import HooglePlus.Example
 
 import Control.Exception
@@ -40,7 +40,7 @@ import Outputable hiding (text, (<+>))
 import qualified CoreSyn as Syn
 import qualified Data.Map as Map hiding (map, foldr)
 import qualified Data.Set as Set hiding (map)
-import qualified Data.Text as Text
+import qualified Data.Text as T
 import SimplCore (core2core)
 import System.Directory (removeFile)
 import Text.Printf
@@ -168,95 +168,55 @@ check_ goal searchParams solverChan checkerChan example = do
         (env, destType) = preprocessEnvFromGoal goal
         -- returns the program with symbols replaced
         executeCheck prog = do
-            ghcChecks <- runGhcChecks searchParams env destType prog
-            if ghcChecks 
-                then do
-                    progs <- runExampleChecks searchParams env destType prog example
-                    case progs of -- TODO refactor
-                        _:_ -> do
-                            liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': accepted - origin of : " ++ show (length progs) ++ " solutions"
-                            return progs
-                        []  -> do
-                            liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match."
-                            return []
-                else return []
+            progs <- runExampleChecks searchParams env destType prog example
+            case progs of
+                []  -> do
+                    liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match."
+                    return []
+                _:_ -> do 
+                    ghcChecks <- mapM (runGhcChecks searchParams env destType) progs
+                    return $ catMaybes ghcChecks
+                
+            
 
 -- validate type signiture, run demand analysis, and run filter test
 -- checks the end result type checks; all arguments are used; and that the program will not immediately fail
-runGhcChecks :: MonadIO m => SearchParams -> Environment -> RType -> UProgram -> FilterTest m Bool
+runGhcChecks :: MonadIO m => SearchParams -> Environment -> RType -> UProgram -> FilterTest m (Maybe UProgram)
 runGhcChecks params env goalType prog  = let
-    -- remove module prefix from prog (Symbol.)
-    prog' = removeProgModulePrefix prog
-    -- constructs program and its type signature as strings
-    (modules, funcSig, body, argList) = extractSolution env goalType prog'
+     -- constructs program and its type signature as strings
+    (modules, funcSig, body, argList) = extractSolution env goalType prog
     tyclassCount = length $ Prelude.filter (\(id, _) -> tyclassArgBase `isPrefixOf` id) argList
-    -- all the used symbols in prog
-    symbols = Set.toList $ usedSymbols prog'
-    -- body where the used symbols are also parameters
-    -- in order to typecheck and compile
-    body' = addSymbolLets body symbols
-    expr = body' ++ " :: " ++ funcSig
+    expr = body ++ " :: " ++ funcSig
     disableDemand = _disableDemand params
     disableFilter = _disableFilter params
-    -- Symbol is only for generating the database, 
-    -- not supposed to be used to compile the solutions
-    modules' = filter (/= "Symbol") modules 
     in do
-        typeCheckResult <- if disableDemand then return (Right True) else liftIO $ runInterpreter $ checkType expr modules'
-        case trace ("Expr==" ++ expr) typeCheckResult of
+        typeCheckResult <- if disableDemand then return (Right True) else liftIO $ runInterpreter $ checkType expr modules
+        strictCheckResult <- if disableDemand then return True else liftIO $ checkStrictness tyclassCount body funcSig modules
+        filterCheckResult <- if disableFilter then return True else runChecks body funcSig modules
+        case typeCheckResult of
             Left err -> do 
                 liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by GHC: type check."
                 liftIO $ hPutStrLn stderr (displayException err) 
-                return False
+                return Nothing
             Right False -> do
                 liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by GHC: type check."
                 liftIO $ putStrLn "Program does not typecheck" 
-                return False
-            Right True -> return True
-                -- FIXME: dependency analysis & filter checks does not work with symbol defined as undefined
-                -- dependency analysis is rejecting drop symbol arg1
-                {-strictCheckResult <- if disableDemand then return True else liftIO $ checkStrictness tyclassCount body' funcSig modules'
-                if strictCheckResult 
-                    then do 
-                        filterCheckResult <- if disableFilter then return True else runChecks body' funcSig modules'
-                        when (not filterCheckResult) $ liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by GHC: filter check."
-                        return True --filterCheckResult
-                    else do
-                        liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by GHC: dependency analysis."
-                        return False-}
-
-    where
-        -- returns all the used symbols
-        usedSymbols :: UProgram -> Set.Set String
-        usedSymbols prog = 
-            case content prog of
-                (PSymbol id)
-                    | isSymbol id -> Set.singleton id
-                    | otherwise -> Set.empty
-                (PApp id args) -> let
-                    sArgs = foldr (\c r -> Set.union (usedSymbols c) r) Set.empty args in
-                        if isSymbol id then Set.insert id sArgs else sArgs
-                _ -> error "Solution expected to have only PSym and PApp"
-
-        -- add symbols in let so that the program compiles
-        addSymbolLets :: String -> [String] -> String
-        addSymbolLets lambda symbols = let
-            letBindings = foldr (\c r -> printf "%s = undefined; %s" c r) "" symbols in
-                printf "let %s in %s" letBindings lambda
-
-        -- remove module prefix of all occurences of symbols (Symbol.symbolInt -> symbolInt)
-        removeProgModulePrefix :: UProgram -> UProgram
-        removeProgModulePrefix p = case content p of
-            PSymbol id
-                | isSymbolWithPrefix id -> p {content = PSymbol (removeModulePrefix id)}
-                | otherwise -> p
-            PApp id args -> let
-                id' = if isSymbolWithPrefix id then removeModulePrefix id else id
-                args' = map removeProgModulePrefix args in
-                    p {content = PApp id' args'}
+                return Nothing
+            Right True
+                | strictCheckResult -> do 
+                    if filterCheckResult
+                        then do
+                            liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by GHC: filter check."
+                            return $ Just prog
+                        else do 
+                            liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': accepted."
+                            return Nothing
+                | otherwise -> do
+                    liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by GHC: dependency analysis."
+                    return Nothing
 
 -- run the match algorithm against an example and return
--- a new program with the symbols replaced
+-- new programs with the symbols replaced
 runExampleChecks :: MonadIO m 
                  => SearchParams 
                  -> Environment 
@@ -269,23 +229,39 @@ runExampleChecks params env goalType prog example = do
     let argsNames = map fst argList
     let progWithoutTc = removeTc prog
     let (prog', expr) = programToExpr progWithoutTc example argsNames
-    let modules' = filter (/= "Symbol") modules 
     case Match.matchExprsPretty 150 expr functionsEnv (output example) of
         Left err
             | Match.Exception msg <- err -> liftIO (putStrLn $ "match: " ++ msg) >> return []
             | otherwise -> return []
-        Right cs -> do -- TODO refactor; a single replace call;
+        Right cs -> do
             -- replace all non-function symbols built by match
             let prog'' = replaceSymsInProg cs prog'
-            -- get each symbol types
+            
+            -- get symbols of the remaining symbols (functions) if any
             let (_, _, lambda, _) = extractSolution env goalType prog''
-            sts <- getSymbolsTypes lambda modules' funcSig
-            -- synthesize lambdas for the function symbols and replace
-            -- FIXME it should skip the non function
-            case synthLambdas (_symsToLinearSynth env) sts argList cs of
-                [] -> trace (printf "synthLams went wrong: %s %s" (show sts) (show prog') ) $ return []
-                lams@(_:_) -> return [replaceLamsInProg l prog'' | l <- lams]
+            let lambda' = T.unpack $ T.replace (T.pack "Sym") (T.pack "_Sym") (T.pack lambda)
+            let expr = lambda' ++ " :: " ++ funcSig
+            mbsts <- getHolesTypes expr modules "Sym"
+            
+            case mbsts of
+                -- error getting symbols types, probably compilation error
+                Nothing -> trace "symbols types nothing" $ return []
+                Just sts -> do
+                    -- if any symbol is not a function, it should be replace by match, before...
+                    when (not (allFunTys sts)) $ error "Non function symbol found after match"
+                    
+                    -- synthesize lambdas for the function symbols and replace
+                    case synthLambdas (_symsToLinearSynth env) sts argList cs of
+                        [] -> trace (printf "synthLams went wrong: %s %s" (show sts) (show prog') ) $ return []
+                        lams@(_:_) -> do
+                            let progsWithLams = [replaceLamsInProg l prog'' | l <- lams]
+                            mbsProgs <- mapM replaceWilcards progsWithLams
+                            return $ catMaybes mbsProgs
     where
+        -- true if all the strings represent function types
+        allFunTys :: [(Int, String)] -> Bool
+        allFunTys sts = all (\(_, t) -> T.pack "->" `T.isInfixOf` T.pack t) sts
+        
         -- The symbols in prog are replaced by the result of match
         -- also, when arguments of functions are @@ (typeclass instances)
         replaceSymsInProg :: [(Int, [Expr.Expr], Expr.Expr)] -> UProgram -> UProgram
@@ -319,6 +295,7 @@ runExampleChecks params env goalType prog example = do
             PApp id args -> prog {content = PApp id (map (replaceLamsInProg lams) args)}
             _ -> error "Solution not expexted to have other than PSym and PApp."
 
+        -- remove typeclass arguments
         removeTc :: UProgram -> UProgram
         removeTc p = case content p of
             PSymbol _ -> p
@@ -332,36 +309,39 @@ runExampleChecks params env goalType prog example = do
                         | otherwise -> False
                     _ -> False
 
-        getSymbolsTypes :: MonadIO m 
-                        => String          -- a program whose symbols names are Sym<n>
-                        -> [String]        -- modules
-                        -> String          -- goal type
-                        -> FilterTest m [(Int, String)] -- for each symbol, a pair with index and type
-        getSymbolsTypes lambda modules funcSig = do 
-            let lambda' = Text.unpack $ Text.replace (Text.pack "Sym") (Text.pack "_Sym") (Text.pack lambda)
-            let expr = lambda' ++ " :: " ++ funcSig
-            liftIO $ putStrLn $ "Check hole: " ++ expr
+        -- given an expression fun :: sig with holes, return its types as strings
+        getHolesTypes :: MonadIO m 
+                      => String          -- en expression whose wildcard names are _<prefix><n> with signature
+                      -> [String]        -- modules
+                      -> String          -- prefix of holes; example _h1 -> h
+                      -> FilterTest m (Maybe [(Int, String)]) -- for each symbol, a pair with index and type
+        getHolesTypes expr modules prefix = do
             res <- liftIO $ runInterpreter $ checkType expr modules
             case res of 
-                Left err -> case err of
-                    WontCompile msgs -> return $ map extractType msgs
-                    _ -> error "getSymbolsTypes: Expected error message to be WontCompile"
-                Right _ -> return [] 
-            where 
-                -- extracts the hole type from the "found hole" message
-                extractType :: GhcError -> (Int, String)
-                extractType (GhcError msg) = let
-                    -- holeLine: Found hole: _Sym0 :: Int -> Int -> Int
-                    holeLine = (Text.lines $ Text.pack msg) !! 1 
-                    -- hole: _Sym0 :: Int -> Int -> Int
-                    hole = snd $ Text.break (== '_') holeLine
-                    -- symbolName: _Sym0
-                    symbolName = head $ Text.words hole
-                    -- symbolNum: 0
-                    symbolNum = read (Text.unpack $ Text.drop (length "_Sym") symbolName) :: Int
-                    -- symbolType: Int -> Int -> Int
-                    symbolType = Text.unwords $ drop 2 $ Text.words hole in
-                        (symbolNum, Text.unpack symbolType)
+                Left err -> case err of 
+                    WontCompile msgs -> let msgAsTexts = map (\(GhcError m) -> T.pack m) msgs in
+                        if all (\m -> T.pack "Found hole" `T.isInfixOf` m) msgAsTexts
+                            then return $ Just $ mapMaybe (extractType (T.pack prefix)) msgAsTexts
+                            else trace ("Error: " ++ show msgs) $  return Nothing
+                    _ -> trace "getHolesTypes: Expected error message to be WontCompile" $ return Nothing
+                Right _ -> return (Just [])
+
+        -- extracts the hole type from the "found hole" message
+        -- each hole has name _<prefix><n>
+        -- nothing means that the msg does not have a hole with that prefix
+        extractType :: T.Text -> T.Text -> Maybe (Int, String)
+        extractType prefix msg = let
+            -- holeLine: Found hole: _Sym0 :: Int -> Int -> Int
+            holeLine = (T.lines msg) !! 1 
+            -- hole: _Sym0 :: Int -> Int -> Int
+            hole = snd $ T.break (== '_') holeLine
+            -- symbolName: _Sym0
+            symbolName = head $ T.words hole
+            -- symbolType: Int -> Int -> Int
+            symbolType = T.unwords $ drop 2 $ T.words hole in
+                case T.stripPrefix (T.cons '_' prefix) symbolName of
+                    Just t -> Just (read (T.unpack $ t), T.unpack symbolType)
+                    Nothing -> Nothing
 
         synthLambdas :: [(String, FunctionSignature, Int)]
                      -> [(Int, String)] 
@@ -376,15 +356,34 @@ runExampleChecks params env goalType prog example = do
                 exampSym n = mapMaybe 
                     (\(i, args, val) -> if i == n then Just (args, val) else Nothing)
                     cs
-                
+        
+        -- try replace wildcard generated by match with default values
+        replaceWilcards :: MonadIO m => UProgram -> FilterTest m (Maybe UProgram)
+        replaceWilcards p = do
+            let (modules, funcSig, lambda, _) = extractSolution env goalType p
+            let expr = printf "%s :: %s" lambda funcSig
+            mbwts <- getHolesTypes expr modules ""
+            case mbwts of
+                -- error getting holes types due to compilation error
+                Nothing -> return Nothing 
+                Just wts -> let defaults = map (\(i, t) -> (i, def (_returnType $ parseTypeString t))) wts in
+                    return $ Just $ replaceWildsInProg defaults p
+            where
+                replaceWildsInProg :: [(Int, String)] -> UProgram -> UProgram
+                replaceWildsInProg cs prog = case content prog of
+                    PSymbol id 
+                        | "_" `isPrefixOf` id ->  let
+                            symInd = read (drop (length "_") id) :: Int  in
+                                case lookup symInd cs of
+                                    Nothing -> prog -- it should be a function
+                                    Just repl -> prog {content = PSymbol repl}
+                        | otherwise -> prog
+                    PApp id args -> prog {content = PApp id (map (replaceWildsInProg cs) args)}
+                    _ -> error "Solution not expexted to have other than PSym and PApp."
 
-                {-foldFun :: (Int, String)
-                        -> Maybe [(Int, String)] 
-                        -> Maybe [(Int, String)]
-                foldFun (si, st) r = do
-                    r' <- r
-                    lam <- linearSynth st argsList example (exampSym si)
-                    return $ (si,lam):r'-}
+                -- get a default value for each type as a string
+                def :: ArgumentType -> String
+                def _ = "0" -- FIXME complete
 
 -- ensures that the program type-checks
 checkType :: String -> [String] -> Interpreter Bool
