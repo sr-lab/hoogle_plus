@@ -73,7 +73,7 @@ linearSynth :: [(String, FunctionSignature, Int)] -- env
             -> Example          -- original example
             -> [([E.Expr], E.Expr)]  -- examples inferred by match for the lambda (only 1 for now)
             -> [String]     -- lambdas
-linearSynth env typeStr argList exampTyg exampsLam = trace (printf "linearSynth called for %s" (show typeStr)) $
+linearSynth env typeStr argList exampTyg exampsLam = 
   toString $ sortExprs $ filterSyms $ applyMatch $ filterArgs exprs
     where
       -- Data needed by the synthesis pipeline
@@ -105,8 +105,8 @@ linearSynth env typeStr argList exampTyg exampsLam = trace (printf "linearSynth 
           giveArgs symCount incomplete (ty:tys) = let
             cands = mapMaybe 
               (\(cName, cTy, cIndex) -> case matchTypes [] ty cTy of
-                Nothing -> trace (printf "Types %s vs %s do NOT match" (show ty) (show cTy)) Nothing
-                Just sts -> trace (printf "Types %s vs %s match" (show ty) (show cTy)) $ Just (cName, map (applySubsts sts) tys, cIndex))
+                Nothing -> Nothing
+                Just sts -> Just (cName, map (applySubsts sts) tys, cIndex))
               argCandidates
             candsAppended = map (\(exps, ct, ci) -> (incomplete ++ [E.Var ci], ct)) cands
               ++ [(incomplete ++ [E.Sym symCount], tys)]
@@ -121,13 +121,13 @@ linearSynth env typeStr argList exampTyg exampsLam = trace (printf "linearSynth 
 
       -- remove expressions that do not use all the lambda arguments
       filterArgs :: [E.Expr] -> [E.Expr]
-      filterArgs es =  trace ("exprs: " ++ show (length es)) $ let
+      filterArgs es =  let
         vars = sort $ nub $ map (\(x,y,z)->z) lamArgs in
         filter (\e -> vars `isInfixOf` (sort $ nub $ E.variables e)) es
 
       -- remove expressions that have symbols to replace
       filterSyms :: [E.Expr] -> [E.Expr]
-      filterSyms es = trace ("applyMatch: " ++ show (length es) ++ "; eq: " ++ show (head es == head exprs)) $ filter (null . E.symbols) es
+      filterSyms es = filter (null . E.symbols) es
 
       -- replace symbols if match
       applyMatch :: [E.Expr] -> [E.Expr]

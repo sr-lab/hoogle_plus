@@ -67,7 +67,7 @@ fromMaybe :: a -> Maybe a -> a
 listToMaybe :: [a] -> Maybe a
 maybeToList :: Maybe a -> [a]
 catMaybes :: [Maybe a] -> [a]
---mapMaybe :: (a -> Maybe b) -> [a] -> [b]
+mapMaybe :: (a -> Maybe b) -> [a] -> [b]
 module GHC.Num
 (+) :: Num a => a -> a -> a
 (-) :: Num a => a -> a -> a
@@ -87,8 +87,8 @@ null :: [a] -> Bool
 length :: [a] -> Int
 (!!) :: [a] -> Int -> a
 infixl 9 !!
-foldl :: forall a b. (b -> a -> b) -> b -> [a] -> b
-foldl' :: forall a b. (b -> a -> b) -> b -> [a] -> b
+foldl :: (b -> a -> b) -> b -> [a] -> b
+foldl' :: (b -> a -> b) -> b -> [a] -> b
 foldl1 :: (a -> a -> a) -> [a] -> a
 foldl1' :: (a -> a -> a) -> [a] -> a
 scanl :: (b -> a -> b) -> b -> [a] -> [b]
@@ -153,7 +153,7 @@ const :: a -> b -> a
 (.) :: (b -> c) -> (a -> b) -> a -> c
 infixr 9 .
 flip :: (a -> b -> c) -> b -> a -> c
-($) :: forall r a (b :: TYPE r). (a -> b) -> a -> b
+($) :: (a -> b) -> a -> b
 infixr 0 $
 (&) :: a -> (a -> b) -> b
 infixl 1 &
@@ -938,34 +938,34 @@ instance GHC.Base.Monad Data.Proxy.Proxy
 instance GHC.Base.MonadPlus Data.Proxy.Proxy
 module Data.Ord
 class Eq a => Ord a
-compare :: Ord a => a -> a -> Ordering
+--compare :: Ord a => a -> a -> Ordering
 (<) :: Ord a => a -> a -> Bool
 (<=) :: Ord a => a -> a -> Bool
 (>) :: Ord a => a -> a -> Bool
 (>=) :: Ord a => a -> a -> Bool
 max :: Ord a => a -> a -> a
 min :: Ord a => a -> a -> a
-infix 4 <=
-infix 4 >=
-infix 4 <
-infix 4 >
-data Ordering
-LT :: Ordering
-EQ :: Ordering
-GT :: Ordering
-newtype Down a
-Down :: a -> Down a
-comparing :: Ord a => (b -> a) -> b -> b -> Ordering
-instance GHC.Base.Monoid a => GHC.Base.Monoid (Data.Ord.Down a)
-instance GHC.Base.Semigroup a => GHC.Base.Semigroup (Data.Ord.Down a)
-instance GHC.Num.Num a => GHC.Num.Num (Data.Ord.Down a)
-instance GHC.Read.Read a => GHC.Read.Read (Data.Ord.Down a)
-instance GHC.Show.Show a => GHC.Show.Show (Data.Ord.Down a)
-instance GHC.Classes.Eq a => GHC.Classes.Eq (Data.Ord.Down a)
-instance GHC.Classes.Ord a => GHC.Classes.Ord (Data.Ord.Down a)
-instance GHC.Base.Functor Data.Ord.Down
-instance GHC.Base.Applicative Data.Ord.Down
-instance GHC.Base.Monad Data.Ord.Down
+--infix 4 <=
+--infix 4 >=
+--infix 4 <
+--infix 4 >
+--data Ordering
+--LT :: Ordering
+--EQ :: Ordering
+--GT :: Ordering
+--newtype Down a
+--Down :: a -> Down a
+--comparing :: Ord a => (b -> a) -> b -> b -> Ordering
+--instance GHC.Base.Monoid a => GHC.Base.Monoid (Data.Ord.Down a)
+--instance GHC.Base.Semigroup a => GHC.Base.Semigroup (Data.Ord.Down a)
+--instance GHC.Num.Num a => GHC.Num.Num (Data.Ord.Down a)
+--instance GHC.Read.Read a => GHC.Read.Read (Data.Ord.Down a)
+--instance GHC.Show.Show a => GHC.Show.Show (Data.Ord.Down a)
+--instance GHC.Classes.Eq a => GHC.Classes.Eq (Data.Ord.Down a)
+--instance GHC.Classes.Ord a => GHC.Classes.Ord (Data.Ord.Down a)
+--instance GHC.Base.Functor Data.Ord.Down
+--instance GHC.Base.Applicative Data.Ord.Down
+--instance GHC.Base.Monad Data.Ord.Down
 module Data.Either
 data Either a b
 Left :: a -> Either a b
@@ -1092,8 +1092,8 @@ intercalate :: [a] -> [[a]] -> [a]
 transpose :: [[a]] -> [[a]]
 subsequences :: [a] -> [[a]]
 permutations :: [a] -> [[a]]
-foldl :: forall a b. (b -> a -> b) -> b -> [a] -> b
-foldl' :: forall a b. (b -> a -> b) -> b -> [a] -> b
+foldl :: (b -> a -> b) -> b -> [a] -> b
+foldl' :: (b -> a -> b) -> b -> [a] -> b
 foldl1 :: (a -> a -> a) -> [a] -> a
 foldl1' :: (a -> a -> a) -> [a] -> a
 foldr :: (a -> b -> b) -> b -> [a] -> b

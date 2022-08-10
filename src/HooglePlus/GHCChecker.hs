@@ -170,9 +170,7 @@ check_ goal searchParams solverChan checkerChan example = do
         executeCheck prog = do
             progs <- runExampleChecks searchParams env destType prog example
             case progs of
-                []  -> do
-                    liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match."
-                    return []
+                []  -> return []
                 _:_ -> do 
                     ghcChecks <- mapM (runGhcChecks searchParams env destType) progs
                     return $ catMaybes ghcChecks
@@ -206,10 +204,10 @@ runGhcChecks params env goalType prog  = let
                 | strictCheckResult -> do 
                     if filterCheckResult
                         then do
-                            liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by GHC: filter check."
+                            liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': accepted."
                             return $ Just prog
                         else do 
-                            liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': accepted."
+                            liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by GHC: filter check."
                             return Nothing
                 | otherwise -> do
                     liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by GHC: dependency analysis."
@@ -230,9 +228,17 @@ runExampleChecks params env goalType prog example = do
     let progWithoutTc = removeTc prog
     let (prog', expr) = programToExpr progWithoutTc example argsNames
     case Match.matchExprsPretty 150 expr functionsEnv (output example) of
-        Left err
-            | Match.Exception msg <- err -> liftIO (putStrLn $ "match: " ++ msg) >> return []
-            | otherwise -> return []
+        Left err ->
+            case err of 
+                Match.Exception msg -> do 
+                    liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match (exception on match: " ++ msg ++ ")."
+                    return []
+                Match.Mismatch -> do
+                    liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match (mismatch)."
+                    return []
+                Match.DepthReached -> do
+                    liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match (max depth reached)."
+                    return []
         Right cs -> do
             -- replace all non-function symbols built by match
             let prog'' = replaceSymsInProg cs prog'
@@ -245,14 +251,18 @@ runExampleChecks params env goalType prog example = do
             
             case mbsts of
                 -- error getting symbols types, probably compilation error
-                Nothing -> trace "symbols types nothing" $ return []
+                Nothing -> do 
+                    liftIO $ putStrLn ("Test \'" ++ show prog ++ "\': rejected by match (compilation)")
+                    return []
                 Just sts -> do
                     -- if any symbol is not a function, it should be replace by match, before...
                     when (not (allFunTys sts)) $ error "Non function symbol found after match"
                     
                     -- synthesize lambdas for the function symbols and replace
                     case synthLambdas (_symsToLinearSynth env) sts argList cs of
-                        [] -> trace (printf "synthLams went wrong: %s %s" (show sts) (show prog') ) $ return []
+                        [] -> do 
+                            liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match (synthesizing lambdas)."
+                            return []
                         lams@(_:_) -> do
                             let progsWithLams = [replaceLamsInProg l prog'' | l <- lams]
                             mbsProgs <- mapM replaceWilcards progsWithLams

@@ -81,7 +81,7 @@ parseExample str = case parse expr "" str of
     lexer = makeTokenParser style
       where
         style = emptyDef { identStart = letter
-                         , identLetter = alphaNum
+                         , identLetter = alphaNum <|> char '.'
                          , reservedNames = []}
 
     expr :: Parser Expr

@@ -339,6 +339,59 @@ orListF = Lam [0]
       Alt "Cons" [1, 2] (App (Var $ -35) [Var 1, App (Var $ -55) [Var 2]])
     ]
   )
+
+allF :: Expr
+allF = 
+  Lam 
+    [0, 1] -- 0:a->Bool, 1:[a]
+    (Case (Var 1)
+      [
+        Alt "Nil" [] true,
+        Alt "Cons" [2, 3] (
+          Case (App (Var 0) [Var 2]) [
+            Alt "Data.Bool.False" [] false,
+            Alt "Data.Bool.True" [] (App (Var $ -76) [Var 0, Var 3])
+          ]
+        )
+      ]
+    )
+
+anyF :: Expr
+anyF = 
+  Lam 
+    [0, 1] -- 0:a->Bool, 1:[a]
+    (Case (Var 1)
+      [
+        Alt "Nil" [] false,
+        Alt "Cons" [2, 3] (
+          Case (App (Var 0) [Var 2]) [
+            Alt "Data.Bool.True" [] true,
+            Alt "Data.Bool.False" [] (App (Var $ -77) [Var 0, Var 3])
+          ]
+        )
+      ]
+    )
+  
+zipWithF :: Expr
+zipWithF = 
+  Lam 
+    [0, 1, 2] --0: a->b->c, 1:[a], 2:[b]
+    (Case (Var 1)
+      [
+        Alt "Nil" [] listNil,
+        Alt "Cons" [3, 4] (
+          Case (Var 2) [
+            Alt "Nil" [] listNil,
+            Alt "Cons" [5, 6] (
+              cons 
+                (App (Var 0) [Var 3, Var 5]) 
+                (App (Var $ -78) [Var 4, Var 6])
+            )
+          ]
+        )
+      ]
+    )
+
 -----------------------------
 -- adapted from Data.Maybe --
 -----------------------------
@@ -446,6 +499,37 @@ catMaybesF =
           )
       ]
     )
+  
+-- mapMaybes
+mapMaybeF :: Expr
+mapMaybeF = 
+  Lam 
+    [0, 1]
+    (Case
+      (Var 1)
+      [
+        Alt "Nil" [] listNil,
+        Alt "Cons" [2, 3] (
+          Case (App (Var 0) [Var 2]) 
+          [ -- mapMaybes: -64
+            Alt "Data.Maybe.Nothing" [] (App (Var $ -64) [Var 0, Var 3]),
+            Alt "Data.Maybe.Just" [4] (DataC "Cons" [Var 4, App (Var $ -64) [Var 0, Var 3]])
+          ]
+        )
+      ]
+    )
+
+-- maybe
+maybeF :: Expr
+maybeF = 
+  Lam 
+    [0, 1, 2] -- 0: default, 1:h.o., 2: maybe values
+    (Case 
+      (Var 2)
+      [
+        Alt "Data.Maybe.Nothing" [] (Var 0),
+        Alt "Data.Maybe.Just" [3] (App (Var 1) [Var 3])
+      ])
 
 ------------------------------
 -- adapted from Data.Either --
@@ -453,13 +537,25 @@ catMaybesF =
 
 -- data Either a b = Data.Either.Left a | Right b
 
+-- Left
 leftF :: Expr
 leftF = Lam [0] (DataC "Data.Either.Left" [Var 0])
 
+-- Right
 rightF :: Expr
 rightF = Lam [0] (DataC "Data.Either.Right" [Var 0])
 
--- either (h.o.f.)
+-- either 
+eitherF :: Expr
+eitherF = 
+  Lam [0, 1, 2]
+    (Case (Var 2) 
+      [
+        Alt "Data.Either.Left"  [3] (App (Var 0) [Var 3]),
+        Alt "Data.Either.Right" [3] (App (Var 1) [Var 3])
+      ]
+    )
+
 -- lefts
 leftsN :: Int
 leftsN = -27
@@ -662,6 +758,45 @@ sndF = Lam [0] (Case (Var 0) [Alt "Pair" [1, 2] (Var 2)])
 swapF :: Expr
 swapF = Lam [0] (Case (Var 0) [Alt "Pair" [1, 2] (pair (Var 2) (Var 1))])
 
+-- curry
+curryF :: Expr -- 0:fun, 1:a, 2:b
+curryF = Lam [0, 1, 2] (App (Var 0) [pair (Var 1) (Var 2)])
+
+-- uncurry
+uncurryF :: Expr
+uncurryF = Lam [0, 1] (Case (Var 1) [Alt "Pair" [2, 3] (App (Var 0) [Var 2, Var 3])])
+
+--------------------------------
+-- adapted from Data.Function --
+--------------------------------
+-- id
+idF :: Expr
+idF = Lam [0] (Var 0)
+
+-- const
+constF :: Expr
+constF = Lam [0, 1] (Var 0)
+
+-- (.)
+dotF :: Expr
+dotF = Lam [0, 1, 2] -- 0:(b->c), 1:(a->b), 2:a
+  (App (Var 0) [App (Var 1) [Var 2]])
+
+-- flip
+flipF :: Expr
+flipF = Lam [0, 1, 2] --0:(a->b->c), 1:b, 2:a
+  (App (Var 0) [Var 2, Var 1])
+
+-- ($)
+dollarF :: Expr
+dollarF = Lam [0, 1] --0:(a->b), 1:a
+  (App (Var 0) [Var 1])
+
+-- (&)
+andComerF :: Expr
+andComerF = Lam [0, 1] --0:a, 1:a->b
+  (App (Var 1)[Var 0])
+
 --------------------------
 -- adapted from GHC.Num --
 --------------------------
@@ -711,7 +846,9 @@ mulF =
       ]
     )
 
--- Data.Ord
+---------------------------
+-- adapted from Data.Ord --
+---------------------------
 
 -- (<=)
 lteF :: Expr
@@ -727,6 +864,10 @@ lteF = Lam [0, 1] -- v0 <= v1?
       )
     ]
   )
+
+-- (>=)
+gteF :: Expr
+gteF = Lam [0, 1] (App (Var $ -49) [Var 1, Var 0])
 
 -- (<)
 ltF :: Expr
@@ -748,6 +889,10 @@ ltF = Lam [0, 1] -- v0 <= v1?
     ]
   )
 
+-- (>)
+gtF :: Expr
+gtF = Lam [0, 1] (App (Var $ -50) [Var 1, Var 0])
+
 -- max
 maxF :: Expr
 maxF = Lam [0, 1]
@@ -768,9 +913,6 @@ minF = Lam [0, 1]
     ]
   )
 
-
-idF :: Expr
-idF = Lam [0] (Var 0)
 
 makePairF :: Expr
 makePairF = Lam [0, 1] (DataC "Pair" [Var 0, Var 1])
@@ -862,6 +1004,9 @@ functionsInfo =
     (-42, dropF, "GHC.List.drop"),
     (-60, nilF, "Nil"), -- TYGAR uses Nil, instead of GHC.List.Nil
     (-61, consF, "Cons"),
+    (-76, allF, "GHC.List.all"),
+    (-77, anyF, "GHC.List.any"),
+    (-78, zipWithF, "GHC.List.zipWith"),
 
     -- Data.Maybe
     (-56, nothingF, "Data.Maybe.Nothing"),
@@ -873,7 +1018,8 @@ functionsInfo =
     (-24, fromJustF, "Data.Maybe.fromJust"),
     (-25, maybeToListF, "Data.Maybe.maybeToList"),
     (-26, catMaybesF, "Data.Maybe.catMaybes"),
-    -- mapMaybes, maybe
+    (-64, mapMaybeF, "Data.Maybe.mapMaybe"),
+    (-65, maybeF, "Data.Maybe.maybe"),
     
     -- Data.Either
     (-58, leftF, "Data.Either.Left"),
@@ -885,7 +1031,7 @@ functionsInfo =
     (-31, isLeftF, "Data.Either.isLeft"),
     (-32, isRightF, "Data.Either.isRight"),
     (-33, partitionEithersF, "Data.Either.partitionEithers"),
-    -- either
+    (-66, eitherF, "Data.Either.either"),
 
     -- Data.Bool
     (-62, trueF, "Data.Bool.True"),
@@ -894,24 +1040,39 @@ functionsInfo =
     (-35, orF, "(Data.Bool.||)"),
     (-36, boolF, "Data.Bool.bool"),
     (-53, notF, "Data.Bool.not"),
-    -- otherwise 
+    -- otherwise is not needed
 
     -- Data.Tuple
     (-37, fstF, "Data.Tuple.fst"),
     (-38, sndF, "Data.Tuple.snd"),
     (-39, swapF, "Data.Tuple.swap"),
-    -- curry, uncurry
+    (-67, curryF, "Data.Tuple.curry"),
+    (-68, uncurryF, "Data.Tuple.uncurry"),
+
+    -- Data.Function
+    (-3, idF, "Data.Function.id"),
+    (-69, constF, "Data.Function.const"),
+    (-70, dotF, "(Data.Function..)"),
+    (-71, flipF, "Data.Function.flip"),
+    (-72, dollarF, "(Data.Function.$)"),
+    (-73, andComerF, "(Data.Function.&)"),
+    -- fix, on need recursive let/definitions
 
     -- GHC.Num
     (-43, subF, "(GHC.Num.-)"),
     (-44, mulF, "(GHC.Num.*)"),
     (-11, addF, "(GHC.Num.+)"),
+    -- TODO ...
 
-    (-49, lteF, "(<=)"),
-    (-50, ltF, "<"),
-    (-51, maxF, "max"),
-    (-52, minF, "min"),
-    (-3, idF, "id"),
+    -- Data.Ord
+    (-49, lteF, "(Data.Ord.<=)"),
+    (-74, gteF, "(Data.Ord.>=)"),
+    (-50, ltF, "(Data.Ord.<)"),
+    (-75, gtF, "(Data.Ord.>)"),
+    (-51, maxF, "Data.Ord.max"),
+    (-52, minF, "Data.Ord.min"),
+    -- compare is not interesting, returns ordering
+    
     (-7, reverseIterF, "reverse-iter"),
     (-13, oddF, "odd")
   ]

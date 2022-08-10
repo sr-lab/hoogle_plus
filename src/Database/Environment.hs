@@ -20,6 +20,7 @@ import Control.Monad.State (evalStateT)
 import System.Exit (exitFailure)
 import Text.Parsec.Pos (initialPos)
 import Text.Printf
+import Data.Maybe (fromJust)
 
 import Synquid.Error (Pos(Pos))
 import Synquid.Logic (ftrue)
@@ -164,6 +165,7 @@ filesToLinearSynthSymbs fps modules = foldr (\fp r -> do r' <- r; c <- readFileT
         parseLines [] _ modOk acc = acc
         parseLines (h:t) curMod modOk acc
           -- current line is a module declaration
+          | modOk && T.pack "forall" `T.isInfixOf` h = trace ("forall not supported on type declarations, skip declaration:" ++ T.unpack h) $ parseLines t curMod modOk acc
           | Just mod <- T.stripPrefix (T.pack "module ") (T.strip h) =
             let str = T.strip mod in
               if T.null str 
@@ -178,15 +180,15 @@ filesToLinearSynthSymbs fps modules = foldr (\fp r -> do r' <- r; c <- readFileT
           | T.pack "infixr " `T.isPrefixOf` (T.strip h) = parseLines t curMod modOk acc
           | T.pack "infixl " `T.isPrefixOf` (T.strip h) = parseLines t curMod modOk acc
           | T.pack "type " `T.isPrefixOf` (T.strip h) = parseLines t curMod modOk acc
+          | T.pack "newtype " `T.isPrefixOf` (T.strip h) = parseLines t curMod modOk acc
           | T.pack "--" `T.isPrefixOf` (T.strip h) = parseLines t curMod modOk acc
           -- current line is a declaration id :: type, but ignore because 
           -- that modules is not to consider
           | not modOk = parseLines t curMod modOk acc
           -- current line is a declaration id :: type, and the modules is to consider
-          | otherwise = let decl = T.splitOn (T.pack "::") h in
-            if length decl < 2 then error $ "parse file LS: " ++ show h else
-              let nm = T.unpack $ T.strip (decl !! 0) 
-                  ty = T.unpack $ T.unwords $ map (T.strip) (tail decl) in
+          | otherwise = let decl = T.breakOn (T.pack "::") h in
+              let nm = T.unpack $ T.strip (fst decl) 
+                  ty = T.unpack $ fromJust $ T.stripPrefix (T.pack "::") $ T.strip (snd decl) in
                 if null nm || null ty 
                   then error $ printf "name or type empty in %s" h
                   else 
