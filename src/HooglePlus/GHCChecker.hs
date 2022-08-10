@@ -227,8 +227,8 @@ runExampleChecks params env goalType prog example = do
     let argsNames = map fst argList
     let progWithoutTc = removeTc prog
     let (prog', expr) = programToExpr progWithoutTc example argsNames
-    case Match.matchExprsPretty 150 expr functionsEnv (output example) of
         Left err ->
+    case Match.matchExprsPretty 150 expr functionsEnv (output example) of
             case err of 
                 Match.Exception msg -> do 
                     liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match (exception on match: " ++ msg ++ ")."
@@ -358,10 +358,12 @@ runExampleChecks params env goalType prog example = do
                      -> [(TC.Id, RSchema)] 
                      -> [(Int, [Expr.Expr], Expr.Expr)]
                      -> [[(Int, String)]]
-        synthLambdas env sts argsList cs = --foldr foldFun (Just []) sts
+        synthLambdas env sts argsList cs =
+            -- cartesian product
             sequence $ map (\(si, st) -> 
                 [(si, lam) |lam <- linearSynth env st argsList example (exampSym si)]) sts
             where
+                -- filter all the examples for the specified function whose id is n
                 exampSym :: Int -> [([Expr.Expr], Expr.Expr)]
                 exampSym n = mapMaybe 
                     (\(i, args, val) -> if i == n then Just (args, val) else Nothing)
@@ -375,7 +377,8 @@ runExampleChecks params env goalType prog example = do
             mbwts <- getHolesTypes expr modules ""
             case mbwts of
                 -- error getting holes types due to compilation error
-                Nothing -> return Nothing 
+                Nothing -> return Nothing
+                Just [] -> return $ Just p 
                 Just wts -> let defaults = map (\(i, t) -> (i, def (_returnType $ parseTypeString t))) wts in
                     return $ Just $ replaceWildsInProg defaults p
             where
@@ -385,7 +388,7 @@ runExampleChecks params env goalType prog example = do
                         | "_" `isPrefixOf` id ->  let
                             symInd = read (drop (length "_") id) :: Int  in
                                 case lookup symInd cs of
-                                    Nothing -> prog -- it should be a function
+                                    Nothing -> error $ printf "Wildcard %s without type default in %s" (show id) (show cs) 
                                     Just repl -> prog {content = PSymbol repl}
                         | otherwise -> prog
                     PApp id args -> prog {content = PApp id (map (replaceWildsInProg cs) args)}

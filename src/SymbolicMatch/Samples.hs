@@ -1089,16 +1089,47 @@ functionsNames = map (\(k, _, v)->(k, v)) functionsInfo
 lookupFun :: String -> Maybe Int
 lookupFun id = listToMaybe $ map (\(int, _, _) -> int) $ filter (\(int, _, str)->str == id) functionsInfo
 
+-- names and arity
+dataConstrs :: [(String, Int)]
+dataConstrs = [ ("Data.Either.Left", 1)
+              , ("Data.Either.Right", 1)
+              , ("Cons", 2)
+              , ("Nil", 0)
+              , ("Pair", 1)
+              , ("S", 1)
+              , ("Z", 0)
+              , ("Data.Maybe.Just", 1)
+              , ("Data.Maybe.Nothing", 0)
+              , ("Data.Bool.True", 0)
+              , ("Data.Bool.False", 0)]
+
+dataConstrsNames :: [String]
+dataConstrsNames = map fst dataConstrs
+
 -- returns whether name is a data constructor or not
 isDataC :: String -> Bool
-isDataC name = name `elem` [ "Data.Either.Left"
-                           , "Data.Either.Right"
-                           , "Cons"
-                           , "Nil"
-                           , "Pair"
-                           , "S"
-                           , "Z"
-                           , "Data.Maybe.Just"
-                           , "Data.Maybe.Nothing"
-                           , "Data.Bool.True"
-                           , "Data.Bool.False"]
+isDataC name = name `elem` dataConstrsNames
+
+-- a weak form of typechecking...
+validate :: Expr -> Bool
+validate (Lam es e) = validate e
+validate (Var _) = True
+validate (Sym _) = True
+validate (DataC n es) = 
+  case lookup n dataConstrs of
+    Nothing -> False
+    Just arity -> length es == arity && all validate es &&
+      (case n of 
+        "Cons"-> case es !! 1 of 
+          DataC n' es' -> n' == "Nil" || n' == "Cons"
+          WildCard -> True 
+          _ -> False
+        "S" -> case head es of
+          DataC n' es' -> n' == "S" || n' == "Z"
+          WildCard -> True
+          _ -> False
+        _ -> True)
+validate (App e es) = all validate (e:es)
+validate (Case e alts) = validate e && all (\(Alt _ _ es) -> validate es) alts
+validate WildCard = True
+validate (Lit _) = True

@@ -74,7 +74,7 @@ linearSynth :: [(String, FunctionSignature, Int)] -- env
             -> [([E.Expr], E.Expr)]  -- examples inferred by match for the lambda (only 1 for now)
             -> [String]     -- lambdas
 linearSynth env typeStr argList exampTyg exampsLam = 
-  toString $ sortExprs $ filterSyms $ applyMatch $ filterArgs exprs
+  toString $ sortExprs $ filterValid $ filterSyms $ applyMatch $ filterArgs exprs
     where
       -- Data needed by the synthesis pipeline
       goal :: FunctionSignature
@@ -129,6 +129,10 @@ linearSynth env typeStr argList exampTyg exampsLam =
       filterSyms :: [E.Expr] -> [E.Expr]
       filterSyms es = filter (null . E.symbols) es
 
+      -- remove invalid expres (like Cons 1 1)
+      filterValid :: [E.Expr] -> [E.Expr]
+      filterValid es = filter S.validate es
+
       -- replace symbols if match
       applyMatch :: [E.Expr] -> [E.Expr]
       applyMatch es = mapMaybe 
@@ -152,4 +156,4 @@ linearSynth env typeStr argList exampTyg exampsLam =
       toString es = let
         dict = S.functionsNames ++ map (\(x, y, z) -> (z, x)) argCandidates 
         params = intercalate " " (map (\(x, y, z) -> x) lamArgs) in
-          map (\e -> printf "(\\%s -> %s)" params (E.showExpr dict e)) es
+          map (\e -> trace (show e) $ printf "(\\%s -> %s)" params (E.showExpr dict e)) es
