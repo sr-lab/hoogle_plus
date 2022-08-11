@@ -7,11 +7,11 @@ module SymbolicMatch.Match
 
 import Data.List ( sort )
 import Data.Maybe ( mapMaybe, catMaybes )
-import SymbolicMatch.Expr ( Expr(..), Alt(..), final)
+import SymbolicMatch.Expr ( Expr(..), Alt(..), final, PolyTable, PolyAlt, Rule(..))
 import qualified SymbolicMatch.Constr as C
 import qualified SymbolicMatch.State as S
 import qualified SymbolicMatch.Env as E
-import SymbolicMatch.Eval ( eval )
+import SymbolicMatch.Eval ( eval, choosePoly )
 import SymbolicMatch.Constr (pretty, prettyAll)
 
 data MatchError = DepthReached
@@ -33,6 +33,8 @@ match _ state WildCard ct
 match WildCard state _ ct = Left $ Exception "Src should not be WildCard"
 
 match (Lam n e) state dst ct = Left $ Exception "for now, do not match lambdas!"
+
+match (Poly n) state dst ct = Left $ Exception "for now, do not match poly!"
 
 match (Lit l) state e2 ct
   | S.reachMaxDepth state = Left DepthReached
@@ -122,7 +124,10 @@ match (App e es) state dst ct
               case S.appAssign n es' dst state of
                 Just state' -> ct state'
                 Nothing -> Left Mismatch
-                
+        (Poly table) -> 
+          let es' = map (eval state) es
+              lam = choosePoly table es' in 
+            match (App lam es') (S.incDepth state) dst ct
         a -> Left $ Exception $ "App expression not a var nor lam" ++ show a
   where
     matchApp :: [Expr]
@@ -136,6 +141,7 @@ match (App e es) state dst ct
       where
         exprs = map (S.buildFromConstr state) syms
         -- FIXME o que acontece se a expr não tiver restrições, WildCard?
+
 
 
 matchPairs :: [(Expr, Expr)]

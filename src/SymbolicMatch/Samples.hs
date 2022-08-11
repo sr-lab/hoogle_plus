@@ -846,6 +846,79 @@ mulF =
       ]
     )
 
+--------------------------
+-- adapted from Data.Eq --
+--------------------------
+
+-- (==)
+eqF :: Expr
+eqF = Poly table
+  where
+    table :: PolyTable
+    table = [ PolyAlt [DataConsIn 0 ["Nil", "Cons"]] eqListF
+            , PolyAlt [DataConsIn 1 ["Nil", "Cons"]] eqListF
+            , PolyAlt [DataConsIn 0 [ "Data.Bool.True"
+                                    , "Data.Bool.False"]] eqBoolF
+            , PolyAlt [DataConsIn 1 [ "Data.Bool.True"
+                                    , "Data.Bool.False"]] eqBoolF
+            , PolyAlt [DataConsIn 0 ["Z", "S"]] eqNatF
+            , PolyAlt [DataConsIn 1 ["Z", "S"]] eqNatF
+            ]
+    
+    eqListF :: Expr
+    eqListF = Lam [0, 1]
+      (Case (Var 0)
+        [ Alt "Nil" [] 
+            (Case (Var 1) 
+              [ Alt "Nil" [] true
+              , Alt "Cons" [2, 3] false
+              ]
+            )
+        , Alt "Cons" [2, 3] 
+            (Case (Var 1) 
+              [ Alt "Nil" [] false
+              , Alt "Cons" [4, 5] (
+                Case (App (Var $ -79) [Var 2, Var 4])
+                [ Alt "Data.Bool.True" [] (App eqListF [Var 3, Var 5])
+                , Alt "Data.Bool.False" [] false
+                ])
+              ])
+        ])
+
+    eqBoolF :: Expr
+    eqBoolF = Lam [0, 1] (Case (Var 0) 
+      [ Alt "Data.Bool.True" [] (
+          Case (Var 1)
+          [ Alt "Data.Bool.True" [] true
+          , Alt "Data.Bool.False" [] false
+          ])
+      , Alt "Data.Bool.False" [] (
+          Case (Var 1)
+          [ Alt "Data.Bool.True" [] false
+          , Alt "Data.Bool.False" [] true
+          ])
+      ])
+
+    eqNatF :: Expr
+    eqNatF = Lam [0, 1] (Case (Var 0)
+      [ Alt "Z" [] (
+          Case (Var 1) 
+          [ Alt "Z" []  true
+          , Alt "S" [2] false
+          ])
+      , Alt "S" [2] (
+          Case (Var 1) 
+          [ Alt "Z" [] false
+          , Alt "S" [3] (App eqNatF [Var 2, Var 3])])
+      ])
+
+-- (/=)
+neqF :: Expr
+neqF = Lam [0, 1] (Case (App (Var $ -79) [Var 0, Var 1])
+  [ Alt "Data.Bool.True" [] false
+  , Alt "Data.Bool.False" [] true
+  ])
+
 ---------------------------
 -- adapted from Data.Ord --
 ---------------------------
@@ -1072,6 +1145,10 @@ functionsInfo =
     (-51, maxF, "Data.Ord.max"),
     (-52, minF, "Data.Ord.min"),
     -- compare is not interesting, returns ordering
+
+    -- Data.Eq
+    (-79, eqF, "(Data.Eq.==)"),
+    (-80, neqF, "(Data.Eq./=)"),
     
     (-7, reverseIterF, "reverse-iter"),
     (-13, oddF, "odd")
@@ -1113,6 +1190,7 @@ isDataC name = name `elem` dataConstrsNames
 -- a weak form of typechecking...
 validate :: Expr -> Bool
 validate (Lam es e) = validate e
+validate (Poly _) = True -- Think about it
 validate (Var _) = True
 validate (Sym _) = True
 validate (DataC n es) = 

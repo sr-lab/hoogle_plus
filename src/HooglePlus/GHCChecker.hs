@@ -227,8 +227,8 @@ runExampleChecks params env goalType prog example = do
     let argsNames = map fst argList
     let progWithoutTc = removeTc prog
     let (prog', expr) = programToExpr progWithoutTc example argsNames
-        Left err ->
     case Match.matchExprsPretty 150 expr functionsEnv (output example) of
+        Left err -> 
             case err of 
                 Match.Exception msg -> do 
                     liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match (exception on match: " ++ msg ++ ")."

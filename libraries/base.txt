@@ -87,16 +87,16 @@ null :: [a] -> Bool
 length :: [a] -> Int
 (!!) :: [a] -> Int -> a
 infixl 9 !!
-foldl :: (b -> a -> b) -> b -> [a] -> b
-foldl' :: (b -> a -> b) -> b -> [a] -> b
-foldl1 :: (a -> a -> a) -> [a] -> a
-foldl1' :: (a -> a -> a) -> [a] -> a
-scanl :: (b -> a -> b) -> b -> [a] -> [b]
+--foldl :: (b -> a -> b) -> b -> [a] -> b
+--foldl' :: (b -> a -> b) -> b -> [a] -> b
+--foldl1 :: (a -> a -> a) -> [a] -> a
+--foldl1' :: (a -> a -> a) -> [a] -> a
+--scanl :: (b -> a -> b) -> b -> [a] -> [b]
 --scanl1 :: (a -> a -> a) -> [a] -> [a]
-scanl' :: (b -> a -> b) -> b -> [a] -> [b]
-foldr :: (a -> b -> b) -> b -> [a] -> b
-foldr1 :: (a -> a -> a) -> [a] -> a
-scanr :: (a -> b -> b) -> b -> [a] -> [b]
+--scanl' :: (b -> a -> b) -> b -> [a] -> [b]
+--foldr :: (a -> b -> b) -> b -> [a] -> b
+--foldr1 :: (a -> a -> a) -> [a] -> a
+--scanr :: (a -> b -> b) -> b -> [a] -> [b]
 --scanr1 :: (a -> a -> a) -> [a] -> [a]
 --iterate :: (a -> a) -> a -> [a]
 --iterate' :: (a -> a) -> a -> [a]
@@ -109,11 +109,11 @@ sum :: Num a => [a] -> a
 product :: Num a => [a] -> a
 maximum :: Ord a => [a] -> a
 minimum :: Ord a => [a] -> a
-splitAt :: Int -> [a] -> ([a], [a])
+--splitAt :: Int -> [a] -> ([a], [a])
 --takeWhile :: (a -> Bool) -> [a] -> [a]
 --dropWhile :: (a -> Bool) -> [a] -> [a]
-span :: (a -> Bool) -> [a] -> ([a], [a])
-break :: (a -> Bool) -> [a] -> ([a], [a])
+--span :: (a -> Bool) -> [a] -> ([a], [a])
+--break :: (a -> Bool) -> [a] -> ([a], [a])
 reverse :: [a] -> [a]
 and :: [Bool] -> Bool
 or :: [Bool] -> Bool

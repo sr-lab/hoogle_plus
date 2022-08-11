@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-module SymbolicMatch.Eval (eval) where
+module SymbolicMatch.Eval (eval, choosePoly) where
 
 import qualified SymbolicMatch.State as S
 import SymbolicMatch.Expr
@@ -13,18 +13,24 @@ eval st sym@(Sym n) = case S.getAssign n st of
 
 eval _ lam@(Lam _ _) = lam
 
+eval st poly@(Poly _) = poly
+
 eval st (Var n) = eval st $ S.unsafeGet n st $ "Variable " ++ show n ++ " not found."
 
 eval st (DataC n args) = DataC n (map (eval st) args)
 
 eval _ lit@(Lit _) = lit
 
-eval st (App e es) = 
+eval st (App e es) =
   case eval st e of
     (Lam ps exp) -> 
       let es' = map (eval st) es
           st' = S.bindAll (zip ps es') st in
         eval st' exp
+    (Poly table) ->
+      let es' = map (eval st) es
+          lam = choosePoly table es' in
+        eval st (App lam es')        
     o -> App o $ map (eval st) es
 
 eval st (Case e alts) =
@@ -41,5 +47,20 @@ eval st (Case e alts) =
           eval st' body
       | otherwise = searchAlt n es t
 
-
 eval _ w@WildCard = w
+
+-- given a poly table and the arguments, choose lambda
+-- arguments must be evaluated!
+choosePoly :: PolyTable -> [Expr] -> Expr
+choosePoly [] _ = error "No suitable alternatives for poly."
+choosePoly (PolyAlt rules lam:alts) args
+  | all ruleSat rules = lam
+  | otherwise =  choosePoly alts args
+  where
+    ruleSat :: Rule -> Bool
+    ruleSat (DataConsIn argInd datacs)
+      | argInd < length args = 
+        case args !! argInd of
+          DataC n _-> n `elem` datacs
+          _ -> False
+      | otherwise = error "Bad rule"

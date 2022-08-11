@@ -1,6 +1,7 @@
 module SymbolicMatch.Expr where
 
 data Expr = Lam [Int] Expr -- no currying
+          | Poly PolyTable -- table to choose the specific Lam
           | Var Int
           | Sym Int
           | DataC String [Expr]
@@ -15,6 +16,11 @@ data Alt = Alt String [Int] Expr deriving (Eq, Show, Ord)
 data Lit = LitInt Int
          | LitString String 
          deriving (Eq, Show, Ord)
+
+type PolyTable = [PolyAlt]
+data PolyAlt = PolyAlt [Rule] Expr deriving (Eq, Ord, Show) -- an alternative
+data Rule = DataConsIn Int [String] deriving (Eq, Ord, Show)
+
 
 intToNat :: Int -> Expr
 intToNat n =
@@ -51,7 +57,6 @@ ciToHs e = error $ "ciToHs"++ show e
 hsToCi :: [Int] -> Expr
 hsToCi [] = DataC "Nil" []
 hsToCi (h:t) = DataC "Cons" [intToNat h, hsToCi t]
-
 
 -- | returns the list of the names of symbols in the AST
 symbols :: Expr -> [Int]
@@ -109,6 +114,7 @@ needsPar (Lit _) = False
 needsPar (Var _) = False
 needsPar (Sym _) = False
 needsPar (Lam _ _) = True
+needsPar (Poly _) = True
 needsPar WildCard = False
 needsPar (DataC n es) = n `notElem` ["Z", "S", "Cons", "Nil", "Pair"] && not (null es)
 needsPar (App _ es) = not (null es)
@@ -121,6 +127,7 @@ showExpr env e = fst $ showExpr' 0 e
     showExpr' :: Int -> Expr -> (String, Int)
     showExpr' nextWild WildCard = ('_' : show nextWild, nextWild + 1)
     showExpr' _ (Lam _ _) = error "Solutions not expected to have lambdas."
+    showExpr' _ (Poly _) = error "Solutions not expected to have poly."
     showExpr' nextWild (Var n) = case lookup n env of
       Nothing -> error "Variable id does not exist."
       Just s -> (s, nextWild)
