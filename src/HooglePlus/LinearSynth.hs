@@ -11,7 +11,7 @@ import Types.Common
 import Text.Printf
 
 import qualified SymbolicMatch.Expr as E
-import SymbolicMatch.Match (matchExprsPretty, matchPairsPretty)
+import SymbolicMatch.Match (matchExprsPretty, matchPairsPretty, MatchError (..))
 import qualified SymbolicMatch.Samples as S
 import qualified SymbolicMatch.Env as Env
 
@@ -70,11 +70,11 @@ applySubstsSig sts sig = sig { _argsType = map (applySubsts sts) (_argsType sig)
 linearSynth :: [(String, FunctionSignature, Int)] -- env
             -> String           -- type string for the lambda being synthesized
             -> [(Id, RSchema)]  -- argList from original function
-            -> Example          -- original example
-            -> [([E.Expr], E.Expr)]  -- examples inferred by match for the lambda (only 1 for now)
+            -> (E.Expr -> Either MatchError [(Int, [E.Expr], E.Expr)]) -- a function
+            -> Int              -- next sym to use
             -> [String]     -- lambdas
-linearSynth env typeStr argList exampTyg exampsLam = 
-  toString $ sortExprs $ filterValid $ filterSyms $ applyMatch $ filterArgs exprs
+linearSynth env typeStr argList matchFn nextSym = 
+  toString $ sortExprs $ filterValid $ filterSyms $ applyMatch $ toLam $ filterArgs exprs
     where
       -- Data needed by the synthesis pipeline
       goal :: FunctionSignature
@@ -95,8 +95,8 @@ linearSynth env typeStr argList exampTyg exampsLam =
       argCandidates = tygArgs ++ lamArgs
 
       exprs :: [E.Expr]
-      exprs = concatMap 
-        (\(n, t, i) -> map (\es -> E.App (E.Var i) es) (giveArgs 0 [] (_argsType t))) 
+      exprs = concatMap
+        (\(n, t, i) -> map (\es -> E.App (E.Var i) es) (giveArgs nextSym [] (_argsType t))) 
         env
         where
           -- picks arguments that match the given types
@@ -133,27 +133,19 @@ linearSynth env typeStr argList exampTyg exampsLam =
       filterValid :: [E.Expr] -> [E.Expr]
       filterValid es = filter S.validate es
 
+      -- expr -> Lam args expr
+      toLam :: [E.Expr] -> [E.Expr]
+      toLam es = let argsInds = map (\(_,_,id) -> id) lamArgs in
+        map (\e -> E.Lam argsInds e) es
+
       -- replace symbols if match
       applyMatch :: [E.Expr] -> [E.Expr]
       applyMatch es = mapMaybe 
-            (\e -> case matchPairsPretty 300 (exToPairs e) matchEnv of 
-              Left _ -> Nothing
-              Right cs -> Just $ E.replaceSyms cs e)
-            es
-        where
-          matchEnv :: Env.Env
-          matchEnv = Env.bindAll (zip (iterate (+1) 0) (input exampTyg)) (S.functionsEnv)
-
-          -- pairs (expr w/ args replaced by example input, example output)
-          exToPairs :: E.Expr -> [(E.Expr,E.Expr)]
-          exToPairs e = let
-            lamArgsVars = map (\(x, y, z) -> E.Var z) lamArgs
-            repls = map (\(inputs, _) -> E.replaceAll e (zip lamArgsVars inputs)) exampsLam in
-              zip repls (map (\(_, out)->out) exampsLam)
-
+        (\e -> case matchFn e of 
+          Left _ -> Nothing
+          Right cs -> Just $ E.replaceSyms cs e)
+        es
+        
       -- convert to string
       toString :: [E.Expr] -> [String]
-      toString es = let
-        dict = S.functionsNames ++ map (\(x, y, z) -> (z, x)) argCandidates 
-        params = intercalate " " (map (\(x, y, z) -> x) lamArgs) in
-          map (\e -> trace (show e) $ printf "(\\%s -> %s)" params (E.showExpr dict e)) es
+      toString es = map (\e -> "(" ++ E.showExpr S.functionsNames e ++ ")") es

@@ -56,7 +56,7 @@ import SymbolicMatch.Samples
 import qualified SymbolicMatch.Expr as Expr
 import qualified SymbolicMatch.Eval as Eval (eval)
 import qualified SymbolicMatch.State as State (init)
-import qualified SymbolicMatch.Match as Match (matchExprsPretty, MatchError(..))
+import qualified SymbolicMatch.Match as Match (matchPairsPretty, MatchError(..))
 import qualified Data.Bool (bool)
 import System.IO (stderr, hPutStrLn)
 import HooglePlus.LinearSynth (linearSynth)
@@ -137,15 +137,15 @@ checkStrictness tyclassCount body sig modules =
         (\(SomeException _) -> return False)
         (checkStrictness' tyclassCount body sig modules)
 
-check :: Goal -> SearchParams -> Chan Message -> Chan Message -> Example -> IO ()
-check goal searchParams solverChan checkerChan example = catch
-    (evalStateT (check_ goal searchParams solverChan checkerChan example) emptyFilterState)
+check :: Goal -> SearchParams -> Chan Message -> Chan Message -> [Example] -> IO ()
+check goal searchParams solverChan checkerChan examples = catch
+    (evalStateT (check_ goal searchParams solverChan checkerChan examples) emptyFilterState)
     (\err ->
         writeChan checkerChan (MesgLog 0 "filterCheck" ("error: " ++ show err)) >>
         writeChan checkerChan (MesgClose (CSError err)))
 
-check_ :: MonadIO m => Goal -> SearchParams -> Chan Message -> Chan Message -> Example -> FilterTest m ()
-check_ goal searchParams solverChan checkerChan example = do
+check_ :: MonadIO m => Goal -> SearchParams -> Chan Message -> Chan Message -> [Example] -> FilterTest m ()
+check_ goal searchParams solverChan checkerChan examples = do
     msg <- liftIO $ readChan solverChan
     handleMessages solverChan checkerChan msg
     return ()
@@ -168,7 +168,7 @@ check_ goal searchParams solverChan checkerChan example = do
         (env, destType) = preprocessEnvFromGoal goal
         -- returns the program with symbols replaced
         executeCheck prog = do
-            progs <- runExampleChecks searchParams env destType prog example
+            progs <- runExampleChecks searchParams env destType prog examples
             case progs of
                 []  -> return []
                 _:_ -> do 
@@ -220,14 +220,10 @@ runExampleChecks :: MonadIO m
                  -> Environment 
                  -> RType 
                  -> UProgram 
-                 -> Example 
+                 -> [Example]
                  -> FilterTest m [UProgram]
-runExampleChecks params env goalType prog example = do 
-    let (modules, funcSig, _, argList) = extractSolution env goalType prog
-    let argsNames = map fst argList
-    let progWithoutTc = removeTc prog
-    let (prog', expr) = programToExpr progWithoutTc example argsNames
-    case Match.matchExprsPretty 150 expr functionsEnv (output example) of
+runExampleChecks params env goalType prog examples = do 
+    case Match.matchPairsPretty 150 pairs functionsEnv of
         Left err -> 
             case err of 
                 Match.Exception msg -> do 
@@ -241,7 +237,7 @@ runExampleChecks params env goalType prog example = do
                     return []
         Right cs -> do
             -- replace all non-function symbols built by match
-            let prog'' = replaceSymsInProg cs prog'
+            let prog'' = replaceSymsInProg cs progWithGoodSymNames
             
             -- get symbols of the remaining symbols (functions) if any
             let (_, _, lambda, _) = extractSolution env goalType prog''
@@ -268,6 +264,15 @@ runExampleChecks params env goalType prog example = do
                             mbsProgs <- mapM replaceWilcards progsWithLams
                             return $ catMaybes mbsProgs
     where
+        (modules, funcSig, _, argList) = extractSolution env goalType prog
+
+        progWithGoodSymNames :: UProgram
+        progWithGoodSymNames = changeSymbolsNames $ removeTc prog
+        
+        pairs :: [(Expr.Expr, Expr.Expr)]
+        pairs = let argsNames = map fst argList in 
+            map (\ex -> (programToExpr progWithGoodSymNames ex argsNames, output ex)) examples
+
         -- true if all the strings represent function types
         allFunTys :: [(Int, String)] -> Bool
         allFunTys sts = all (\(_, t) -> T.pack "->" `T.isInfixOf` T.pack t) sts
@@ -341,7 +346,7 @@ runExampleChecks params env goalType prog example = do
         -- nothing means that the msg does not have a hole with that prefix
         extractType :: T.Text -> T.Text -> Maybe (Int, String)
         extractType prefix msg = let
-            -- holeLine: Found hole: _Sym0 :: Int -> Int -> Int
+            -- holeLine: Found h>ole: _Sym0 :: Int -> Int -> Int
             holeLine = (T.lines msg) !! 1 
             -- hole: _Sym0 :: Int -> Int -> Int
             hole = snd $ T.break (== '_') holeLine
@@ -358,16 +363,20 @@ runExampleChecks params env goalType prog example = do
                      -> [(TC.Id, RSchema)] 
                      -> [(Int, [Expr.Expr], Expr.Expr)]
                      -> [[(Int, String)]]
-        synthLambdas env sts argsList cs =
-            -- cartesian product
-            sequence $ map (\(si, st) -> 
-                [(si, lam) |lam <- linearSynth env st argsList example (exampSym si)]) sts
+        synthLambdas env sts argsList cs = case sts of
+            [] -> []
+            ((si, st):sts)
+                | (not . null) sts -> error "more than 1 lam to synthesize"
+                | otherwise -> let 
+                    lams = linearSynth env st argsList (matchFn si) nextSym in
+                        sequence [map (\l -> (si, l)) lams]
             where
-                -- filter all the examples for the specified function whose id is n
-                exampSym :: Int -> [([Expr.Expr], Expr.Expr)]
-                exampSym n = mapMaybe 
-                    (\(i, args, val) -> if i == n then Just (args, val) else Nothing)
-                    cs
+                nextSym = (maximum $ Expr.symbols $ fst $ head $ pairs) + 1 
+
+                matchFn :: Int -> Expr.Expr -> Either Match.MatchError [(Int, [Expr.Expr], Expr.Expr)]
+                matchFn si lam = let
+                    pairs' = map (\(src, dst) -> (Expr.replace src (Expr.Sym si) lam, dst)) pairs in
+                        Match.matchPairsPretty 300 pairs' functionsEnv
         
         -- try replace wildcard generated by match with default values
         replaceWilcards :: MonadIO m => UProgram -> FilterTest m (Maybe UProgram)

@@ -1,4 +1,6 @@
 module SymbolicMatch.Expr where
+import Text.Printf (printf)
+import Data.List (intercalate)
 
 data Expr = Lam [Int] Expr -- no currying
           | Poly PolyTable -- table to choose the specific Lam
@@ -126,10 +128,13 @@ showExpr env e = fst $ showExpr' 0 e
   where -- we print each wild card as a _n, where n is a new number for each
     showExpr' :: Int -> Expr -> (String, Int)
     showExpr' nextWild WildCard = ('_' : show nextWild, nextWild + 1)
-    showExpr' _ (Lam _ _) = error "Solutions not expected to have lambdas."
+    showExpr' nextWild (Lam args body) = let
+        args' = intercalate " " (map (\i -> "x" ++ show i) args)
+        body' = showExpr' nextWild body in
+          (printf "\\%s -> %s" args' (fst body'), snd body')
     showExpr' _ (Poly _) = error "Solutions not expected to have poly."
     showExpr' nextWild (Var n) = case lookup n env of
-      Nothing -> error "Variable id does not exist."
+      Nothing -> ('x':show n, nextWild)
       Just s -> (s, nextWild)
     showExpr' nextWild (Sym s) = ('$':show s, nextWild)
     showExpr' nextWild d@(DataC n es) = case n of

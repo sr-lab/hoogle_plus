@@ -115,9 +115,9 @@ main = do
                         }
             let synquidParams =
                     defaultSynquidParams {Main.envPath = env_file_path_in}
-            case parseExample exampleStr of
+            case parseExamples exampleStr of
               Left err -> putStrLn err
-              Right example -> executeSearch synquidParams searchParams file example
+              Right examples -> executeSearch synquidParams searchParams file examples
         Generate {preset = (Just preset)} -> do
             precomputeGraph (getOptsFromPreset preset)
         Generate Nothing files pkgs mdls d ho pathToEnv hoPath -> do
@@ -246,14 +246,14 @@ precomputeGraph opts = generateEnv opts >>= writeEnv (Types.Generate.envPath opt
 
 
 -- | Parse and resolve file, then synthesize the specified goals
-executeSearch :: SynquidParams -> SearchParams  -> String -> Example -> IO ()
-executeSearch synquidParams searchParams query example = do
+executeSearch :: SynquidParams -> SearchParams  -> String -> [Example] -> IO ()
+executeSearch synquidParams searchParams query examples = do
   env <- readEnv
   goal <- envToGoal env query
   solverChan <- newChan
   checkerChan <- newChan
   workerS <- forkIO $ synthesize searchParams goal solverChan
-  workerC <- forkIO $ check goal searchParams solverChan checkerChan example
+  workerC <- forkIO $ check goal searchParams solverChan checkerChan examples
   readChan checkerChan >>= (handleMessages checkerChan)
   where
     logLevel = searchParams ^. explorerLogLevel

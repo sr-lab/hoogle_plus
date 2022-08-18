@@ -1,6 +1,7 @@
 module HooglePlus.Example ( Example(..)
-                          , parseExample
+                          , parseExamples
                           , programToExpr
+                          , changeSymbolsNames
                           , symbolsDecls
                           , isSymbolWithPrefix
                           , isSymbol
@@ -24,13 +25,7 @@ import Text.Printf (printf)
 import Debug.Trace (trace)
 
 symbolsInfo :: [(String, String)]
-symbolsInfo = [
-  ("symbolGen", "a")
-  --("symbolInt", "Int"),
-  --("symbolListInt", "[Int]")--,
-  --("symbolMaybe", "Maybe a"),
-  --("symbolEither", "Either a b")
-  ]
+symbolsInfo = [("symbolGen", "a")]
 
 symbolModule :: String
 symbolModule = "Symbol"
@@ -64,19 +59,30 @@ data Example = Example {
   output :: Expr
 } deriving Show
 
--- | convert example from a String to SymbolicMatch AST
-parseExample :: String -> Either String Example
-parseExample str = case parse expr "" str of
-  Right example -> trace (showExpr [] example) $ case example of 
-    DataC "Pair" [e1, e2] -> case e1 of 
-      list@(DataC n _) 
-        | n `elem` ["Cons", "Nil"] -> Right Example { input = consToList list
-                                             , output = e2}
-        | otherwise -> Left "first element of an example must be a list" 
-      _ -> Left "first element of an example must be a list" 
-    _ -> Left "example must be a pair"
+-- | convert examples from a String to SymbolicMatch AST
+parseExamples :: String -> Either String [Example]
+parseExamples str = case parse expr "" str of
+  Right examples -> trace (showExpr [] examples) $ case examples of
+    DataC "Nil" [] -> Right []
+    DataC "Cons" _ -> astExsToExamples (consToList examples)
+    _ -> Left "Examples should be a list of pairs"
   Left err -> Left $ show err
   where
+    astExsToExamples :: [Expr] -> Either String [Example]
+    astExsToExamples (e:es) = case e of 
+      DataC "Pair" [e1, e2] -> case e1 of 
+        list@(DataC n _) 
+          | n `elem` ["Cons", "Nil"] -> 
+            let ex = Example { input = consToList list
+                             , output = e2} in 
+              case astExsToExamples es of
+                Left err -> Left err
+                Right exs -> Right (ex:exs)
+          | otherwise -> Left "first element of an example must be a list" 
+        _ -> Left "first element of an example must be a list" 
+      _ -> Left "example must be a pair"
+    astExsToExamples [] = Right []
+
     lexer :: TokenParser ()
     lexer = makeTokenParser style
       where
@@ -119,18 +125,10 @@ parseExample str = case parse expr "" str of
       exps <- many $ (parens lexer expr) <|> insideExpr
       return $ DataC datac exps 
 
--- | convert from Synquid AST to SymbolicMatch AST, replacing args by example inputs
-programToExpr :: UProgram -- solution in Synquid AST
-              -> Example  -- example
-              -> [String] -- argument list
-              -> (UProgram, Expr) -- the program with symbols names replaced (Symbol....)
-                                  -- and the expression to SymbolicMatch
-programToExpr prog example argsNames = let 
-  prog' = fst $ assignSyms prog 0 in
-    (prog', programToExpr' prog' example)
-  where 
-    -- changes the names of the symbols (Symbol.symbol...) to Sym0, Sym1, ...
-    -- to allow having more than one symbol per type
+-- changes the names of the symbols (Symbol.symbol...) to Sym0, Sym1, ...
+changeSymbolsNames :: UProgram -> UProgram
+changeSymbolsNames p = fst $ assignSyms p 0
+  where
     assignSyms :: UProgram -> Int -> (UProgram, Int)
     assignSyms prog nextSym = case content prog of
       (PSymbol id)
@@ -157,6 +155,14 @@ programToExpr prog example argsNames = let
         isTygarSymbol :: String -> Bool 
         isTygarSymbol name = "Symbol.symbol" `isPrefixOf` name
 
+-- | convert from Synquid AST to SymbolicMatch AST, replacing args by example inputs
+programToExpr :: UProgram -- solution in Synquid AST
+              -> Example  -- example
+              -> [String] -- argument list
+              -> Expr     -- and the expression to SymbolicMatch
+programToExpr prog example argsNames =
+  programToExpr' prog example
+  where 
     -- returns the index of the argument: "arg2" -> 1
     lookupArg :: String -> Maybe Int
     lookupArg id
