@@ -392,6 +392,44 @@ zipWithF =
       ]
     )
 
+-- elem
+elemF :: Expr
+elemF = Lam [0, 1]
+  (Case (Var 1)
+    [
+      Alt "Nil" [] false,
+      Alt "Cons" [2, 3] (
+        Case (App (Var $ -79) [Var 0, Var 2]) 
+        [
+          Alt "Data.Bool.False" [] (App (Var $ -81) [Var 0, Var 3]),
+          Alt "Data.Bool.True" [] true
+        ])
+    ])
+
+-- notElem
+notElemF :: Expr
+notElemF = Lam [0, 1]
+  (Case (App (Var $ -81) [Var 0, Var 1])
+    [
+      Alt "Data.Bool.True" [] false,
+      Alt "Data.Bool.False" [] true
+    ])
+
+-- lookup
+lookupF :: Expr
+lookupF = Lam [0, 1] -- 0:a, 1:[(a, b)]
+  (Case (Var 1) [
+    Alt "Nil" [] nothing,
+    Alt "Cons" [2, 3] 
+      (Case (Var 2) [
+        Alt "Pair" [4, 5] 
+          (Case (App (Var $ -79) [Var 0, Var 4])[
+            Alt "Data.Bool.True" [] (just $ Var 5),
+            Alt "Data.Bool.False" [] (App (Var $ -83) [Var 0, Var 3])
+          ])
+      ])
+  ])
+
 -----------------------------
 -- adapted from Data.Maybe --
 -----------------------------
@@ -863,6 +901,8 @@ eqF = Poly table
                                     , "Data.Bool.False"]] eqBoolF
             , PolyAlt [DataConsIn 0 ["Z", "S"]] eqNatF
             , PolyAlt [DataConsIn 1 ["Z", "S"]] eqNatF
+            , PolyAlt [DataConsIn 0 ["Pair"]] eqPairF
+            , PolyAlt [DataConsIn 1 ["Pair"]] eqPairF
             ]
     
     eqListF :: Expr
@@ -911,6 +951,16 @@ eqF = Poly table
           [ Alt "Z" [] false
           , Alt "S" [3] (App eqNatF [Var 2, Var 3])])
       ])
+
+    eqPairF :: Expr
+    eqPairF = Lam [0, 1] (Case (Var 0)
+      [ Alt "Pair" [2, 3] (Case (Var 1) 
+        [
+          Alt "Pair" [4, 5] (App (Var $ -34) [ -- (&&)
+            App (Var $ -79) [Var 2, Var 4], -- v2 == v4
+            App (Var $ -79) [Var 3, Var 5]  -- v3 == v5
+          ])
+        ])])
 
 -- (/=)
 neqF :: Expr
@@ -1080,6 +1130,9 @@ functionsInfo =
     (-76, allF, "GHC.List.all"),
     (-77, anyF, "GHC.List.any"),
     (-78, zipWithF, "GHC.List.zipWith"),
+    (-81, elemF, "GHC.List.elem"),
+    (-82, notElemF, "GHC.List.notElem"),
+    (-83, lookupF, "GHC.List.lookup"),
 
     -- Data.Maybe
     (-56, nothingF, "Data.Maybe.Nothing"),
@@ -1172,7 +1225,7 @@ dataConstrs = [ ("Data.Either.Left", 1)
               , ("Data.Either.Right", 1)
               , ("Cons", 2)
               , ("Nil", 0)
-              , ("Pair", 1)
+              , ("Pair", 2)
               , ("S", 1)
               , ("Z", 0)
               , ("Data.Maybe.Just", 1)

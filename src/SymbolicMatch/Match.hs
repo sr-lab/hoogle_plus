@@ -87,18 +87,19 @@ match (DataC n es) state dst ct
 
 match (Case e alts) state dst ct
   | S.reachMaxDepth state = Left DepthReached
-  | otherwise = matchScrutinee e (Alt "Error" [] (DataC "Error" []):alts) state dst ct
+  | otherwise = matchScrutinee e (Alt "Error" [] (DataC "Error" []):alts) state dst False ct
   where
     -- match the case scrutinee to the patterns
     -- and then match the alternative to the dst
-    matchScrutinee :: Expr -> [Alt] -> S.State -> Expr -> (S.State -> Either MatchError C.ConstrSet) -> Either MatchError C.ConstrSet
-    matchScrutinee _ [] _ _ _ = Left Mismatch
-    matchScrutinee scr ((Alt s ss e):alts) state dst ct =
+    matchScrutinee :: Expr -> [Alt] -> S.State -> Expr -> Bool -> (S.State -> Either MatchError C.ConstrSet) -> Either MatchError C.ConstrSet
+    matchScrutinee _ [] _ _ anyDepthReached _ = Left $ if anyDepthReached then DepthReached else Mismatch
+    matchScrutinee scr ((Alt s ss e):alts) state dst anyDepthReached ct =
       let (syms, state') = S.genSyms (length ss) state
           ct' = \st -> match e (S.bindAll (zip ss syms) st) dst (\st' -> ct (S.newEnv st' (S.env st))) in
         case match scr state' (DataC s syms) ct' of
           Right cs' -> Right cs'
-          Left err -> matchScrutinee scr alts state dst ct
+          Left DepthReached -> matchScrutinee scr alts (S.incDepth state) dst True ct
+          Left _ -> matchScrutinee scr alts (S.incDepth state) dst anyDepthReached ct
 
 
 match (App e es) state dst ct

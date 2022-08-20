@@ -52,7 +52,7 @@ eval _ w@WildCard = w
 -- given a poly table and the arguments, choose lambda
 -- arguments must be evaluated!
 choosePoly :: PolyTable -> [Expr] -> Expr
-choosePoly [] _ = error "No suitable alternatives for poly."
+choosePoly [] es = error $ "No suitable alternatives for poly: " ++ show es
 choosePoly (PolyAlt rules lam:alts) args
   | all ruleSat rules = lam
   | otherwise =  choosePoly alts args

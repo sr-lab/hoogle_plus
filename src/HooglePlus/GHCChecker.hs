@@ -250,13 +250,14 @@ runExampleChecks params env goalType prog examples = do
                 Nothing -> do 
                     liftIO $ putStrLn ("Test \'" ++ show prog ++ "\': rejected by match (compilation)")
                     return []
+                Just [] -> return [prog'']
                 Just sts -> do
                     -- if any symbol is not a function, it should be replace by match, before...
                     when (not (allFunTys sts)) $ error "Non function symbol found after match"
                     
                     -- synthesize lambdas for the function symbols and replace
                     case synthLambdas (_symsToLinearSynth env) sts argList cs of
-                        [] -> do 
+                        [] -> do
                             liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match (synthesizing lambdas)."
                             return []
                         lams@(_:_) -> do
