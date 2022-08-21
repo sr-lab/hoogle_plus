@@ -48,6 +48,7 @@ import Data.List
 import Data.Foldable
 import Data.Serialize
 import Data.Time.Calendar
+import Data.Maybe (isJust)
 import qualified Data.HashMap.Strict as HashMap
 import Data.HashMap.Strict (HashMap)
 import Language.Haskell.Exts (Decl(TypeSig))
@@ -115,9 +116,11 @@ main = do
                         }
             let synquidParams =
                     defaultSynquidParams {Main.envPath = env_file_path_in}
-            case parseExamples exampleStr of
-              Left err -> putStrLn err
-              Right examples -> executeSearch synquidParams searchParams file examples
+            if exampleStr == "" 
+              then executeSearch synquidParams searchParams file Nothing
+              else case parseExamples exampleStr of
+                Left err -> putStrLn err
+                Right examples -> executeSearch synquidParams searchParams file (Just examples)
         Generate {preset = (Just preset)} -> do
             precomputeGraph (getOptsFromPreset preset)
         Generate Nothing files pkgs mdls d ho pathToEnv hoPath -> do
@@ -246,13 +249,13 @@ precomputeGraph opts = generateEnv opts >>= writeEnv (Types.Generate.envPath opt
 
 
 -- | Parse and resolve file, then synthesize the specified goals
-executeSearch :: SynquidParams -> SearchParams  -> String -> [Example] -> IO ()
+executeSearch :: SynquidParams -> SearchParams  -> String -> Maybe [Example] -> IO ()
 executeSearch synquidParams searchParams query examples = do
   env <- readEnv
   goal <- envToGoal env query
   solverChan <- newChan
   checkerChan <- newChan
-  workerS <- forkIO $ synthesize searchParams goal solverChan
+  workerS <- forkIO $ synthesize searchParams goal solverChan (isJust examples)
   workerC <- forkIO $ check goal searchParams solverChan checkerChan examples
   readChan checkerChan >>= (handleMessages checkerChan)
   where

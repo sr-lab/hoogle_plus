@@ -42,7 +42,7 @@ import System.Exit
 import Text.Parsec.Indent
 import Text.Parsec.Pos
 import Text.Printf (printf)
-
+import qualified HooglePlus.Example as Ex (isSymbolWithPrefix)
 
 envToGoal :: Environment -> String -> IO Goal
 envToGoal env queryStr = do
@@ -64,12 +64,15 @@ envToGoal env queryStr = do
 
       _ -> error "parse a signature for a none goal declaration"
 
-synthesize :: SearchParams -> Goal -> Chan Message -> IO ()
-synthesize searchParams goal messageChan = do
+synthesize :: SearchParams -> Goal -> Chan Message -> Bool -> IO ()
+synthesize searchParams goal messageChan useSymbols = do
     let env' = gEnvironment goal
     let destinationType = lastType $ toMonotype $ gSpec goal
     let useHO = _useHO searchParams
-    let rawSyms = env' ^. symbols
+    let rawSyms = if useSymbols 
+        then env' ^. symbols
+        -- remove symbols, because no example was provided.
+        else Map.filterWithKey (\k _ -> not $ Ex.isSymbolWithPrefix k) $ env' ^. symbols
     let hoCands = env' ^. hoCandidates
     env <-
         if useHO -- add higher order query arguments

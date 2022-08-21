@@ -137,14 +137,14 @@ checkStrictness tyclassCount body sig modules =
         (\(SomeException _) -> return False)
         (checkStrictness' tyclassCount body sig modules)
 
-check :: Goal -> SearchParams -> Chan Message -> Chan Message -> [Example] -> IO ()
+check :: Goal -> SearchParams -> Chan Message -> Chan Message -> Maybe [Example] -> IO ()
 check goal searchParams solverChan checkerChan examples = catch
     (evalStateT (check_ goal searchParams solverChan checkerChan examples) emptyFilterState)
     (\err ->
         writeChan checkerChan (MesgLog 0 "filterCheck" ("error: " ++ show err)) >>
         writeChan checkerChan (MesgClose (CSError err)))
 
-check_ :: MonadIO m => Goal -> SearchParams -> Chan Message -> Chan Message -> [Example] -> FilterTest m ()
+check_ :: MonadIO m => Goal -> SearchParams -> Chan Message -> Chan Message -> Maybe [Example] -> FilterTest m ()
 check_ goal searchParams solverChan checkerChan examples = do
     msg <- liftIO $ readChan solverChan
     handleMessages solverChan checkerChan msg
@@ -168,12 +168,17 @@ check_ goal searchParams solverChan checkerChan examples = do
         (env, destType) = preprocessEnvFromGoal goal
         -- returns the program with symbols replaced
         executeCheck prog = do
-            progs <- runExampleChecks searchParams env destType prog examples
-            case progs of
-                []  -> return []
-                _:_ -> do 
-                    ghcChecks <- mapM (runGhcChecks searchParams env destType) progs
-                    return $ catMaybes ghcChecks
+            case examples of
+                Nothing -> do 
+                    ghcCheck <- runGhcChecks searchParams env destType prog
+                    return $ maybeToList ghcCheck
+                Just examples' -> do
+                    progs <- runExampleChecks searchParams env destType prog examples'
+                    case progs of
+                        []  -> return []
+                        _:_ -> do 
+                            ghcChecks <- mapM (runGhcChecks searchParams env destType) progs
+                            return $ catMaybes ghcChecks
                 
             
 
