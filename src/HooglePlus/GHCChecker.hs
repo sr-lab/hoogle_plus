@@ -250,11 +250,17 @@ runExampleChecks params env goalType prog examples = do
                 Nothing -> do 
                     liftIO $ putStrLn ("Test \'" ++ show prog ++ "\': rejected by match (compilation)")
                     return []
-                Just [] -> return [prog'']
+                Just [] -> do
+                    prog''' <- replaceWilcards prog''
+                    case prog''' of
+                        Just prog'''' -> return [prog'''']
+                        Nothing -> do
+                            liftIO $ putStrLn ("Test \'" ++ show prog ++ "\': rejected by match (compilation)")
+                            return []
                 Just sts -> do
                     -- if any symbol is not a function, it should be replace by match, before...
                     when (not (allFunTys sts)) $ error "Non function symbol found after match"
-                    
+                    -- FIXME: should set seed for widlcards in lams, otherwise may colide
                     -- synthesize lambdas for the function symbols and replace
                     case synthLambdas (_symsToLinearSynth env) sts argList cs of
                         [] -> do
@@ -392,21 +398,30 @@ runExampleChecks params env goalType prog examples = do
                 Just wts -> let defaults = map (\(i, t) -> (i, def (_returnType $ parseTypeString t))) wts in
                     return $ Just $ replaceWildsInProg defaults p
             where
+                -- FIXME _hole inside id (text; use replace)
                 replaceWildsInProg :: [(Int, String)] -> UProgram -> UProgram
-                replaceWildsInProg cs prog = case content prog of
-                    PSymbol id 
-                        | "_" `isPrefixOf` id ->  let
-                            symInd = read (drop (length "_") id) :: Int  in
-                                case lookup symInd cs of
-                                    Nothing -> error $ printf "Wildcard %s without type default in %s" (show id) (show cs) 
-                                    Just repl -> prog {content = PSymbol repl}
-                        | otherwise -> prog
-                    PApp id args -> prog {content = PApp id (map (replaceWildsInProg cs) args)}
-                    _ -> error "Solution not expexted to have other than PSym and PApp."
+                replaceWildsInProg wilds prog = aux prog
+                    where
+                    holes :: [(T.Text, T.Text)]
+                    holes = map (\(hi, hd) -> (T.pack ('_':show hi), T.pack hd)) wilds
+
+                    aux :: UProgram -> UProgram
+                    aux prog = case content prog of
+                        PSymbol id -> let id' = foldr (\(hole, def) id'' -> T.replace hole def id'') (T.pack id) holes in
+                            prog {content = PSymbol (T.unpack id')}
+                        PApp id args -> prog {content = PApp id (map aux args)}
+                        _ -> error "Solution not expexted to have other than PSym and PApp."
 
                 -- get a default value for each type as a string
                 def :: ArgumentType -> String
-                def _ = "0" -- FIXME complete
+                def (Concrete "Int") = "0"
+                def (Concrete "Bool") = "False"
+                def (ArgTypeApp (Concrete "Maybe") _) = "Nothing"
+                def (ArgTypeApp (Concrete "Either") t) = "(Left " ++ def t ++ ")"
+                def (ArgTypeList _) = "[]"
+                def (ArgTypeTuple ts) = let defs = map def ts in 
+                    "(" ++ intercalate ", " defs ++ ")"
+                def t = error $ "Default value missing for type " ++ show t
 
 -- ensures that the program type-checks
 checkType :: String -> [String] -> Interpreter Bool

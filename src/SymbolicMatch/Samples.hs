@@ -905,62 +905,62 @@ eqF = Poly table
             , PolyAlt [DataConsIn 1 ["Pair"]] eqPairF
             ]
     
-    eqListF :: Expr
-    eqListF = Lam [0, 1]
-      (Case (Var 0)
-        [ Alt "Nil" [] 
-            (Case (Var 1) 
-              [ Alt "Nil" [] true
-              , Alt "Cons" [2, 3] false
-              ]
-            )
-        , Alt "Cons" [2, 3] 
-            (Case (Var 1) 
-              [ Alt "Nil" [] false
-              , Alt "Cons" [4, 5] (
-                Case (App (Var $ -79) [Var 2, Var 4])
-                [ Alt "Data.Bool.True" [] (App eqListF [Var 3, Var 5])
-                , Alt "Data.Bool.False" [] false
-                ])
-              ])
-        ])
+eqListF :: Expr
+eqListF = Lam [0, 1]
+  (Case (Var 0)
+    [ Alt "Nil" [] 
+        (Case (Var 1) 
+          [ Alt "Nil" [] true
+          , Alt "Cons" [2, 3] false
+          ]
+        )
+    , Alt "Cons" [2, 3] 
+        (Case (Var 1) 
+          [ Alt "Nil" [] false
+          , Alt "Cons" [4, 5] (
+            Case (App (Var $ -79) [Var 2, Var 4])
+            [ Alt "Data.Bool.True" [] (App (Var $ -84) [Var 3, Var 5])
+            , Alt "Data.Bool.False" [] false
+            ])
+          ])
+    ])
 
-    eqBoolF :: Expr
-    eqBoolF = Lam [0, 1] (Case (Var 0) 
-      [ Alt "Data.Bool.True" [] (
-          Case (Var 1)
-          [ Alt "Data.Bool.True" [] true
-          , Alt "Data.Bool.False" [] false
-          ])
-      , Alt "Data.Bool.False" [] (
-          Case (Var 1)
-          [ Alt "Data.Bool.True" [] false
-          , Alt "Data.Bool.False" [] true
-          ])
+eqBoolF :: Expr
+eqBoolF = Lam [0, 1] (Case (Var 0) 
+  [ Alt "Data.Bool.True" [] (
+      Case (Var 1)
+      [ Alt "Data.Bool.True" [] true
+      , Alt "Data.Bool.False" [] false
       ])
-
-    eqNatF :: Expr
-    eqNatF = Lam [0, 1] (Case (Var 0)
-      [ Alt "Z" [] (
-          Case (Var 1) 
-          [ Alt "Z" []  true
-          , Alt "S" [2] false
-          ])
-      , Alt "S" [2] (
-          Case (Var 1) 
-          [ Alt "Z" [] false
-          , Alt "S" [3] (App eqNatF [Var 2, Var 3])])
+  , Alt "Data.Bool.False" [] (
+      Case (Var 1)
+      [ Alt "Data.Bool.True" [] false
+      , Alt "Data.Bool.False" [] true
       ])
+  ])
 
-    eqPairF :: Expr
-    eqPairF = Lam [0, 1] (Case (Var 0)
-      [ Alt "Pair" [2, 3] (Case (Var 1) 
-        [
-          Alt "Pair" [4, 5] (App (Var $ -34) [ -- (&&)
-            App (Var $ -79) [Var 2, Var 4], -- v2 == v4
-            App (Var $ -79) [Var 3, Var 5]  -- v3 == v5
-          ])
-        ])])
+eqNatF :: Expr
+eqNatF = Lam [0, 1] (Case (Var 0)
+  [ Alt "Z" [] (
+      Case (Var 1) 
+      [ Alt "Z" []  true
+      , Alt "S" [2] false
+      ])
+  , Alt "S" [2] (
+      Case (Var 1) 
+      [ Alt "Z" [] false
+      , Alt "S" [3] (App (Var $ -85) [Var 2, Var 3])])
+  ])
+
+eqPairF :: Expr
+eqPairF = Lam [0, 1] (Case (Var 0)
+  [ Alt "Pair" [2, 3] (Case (Var 1) 
+    [
+      Alt "Pair" [4, 5] (App (Var $ -34) [ -- (&&)
+        App (Var $ -79) [Var 2, Var 4], -- v2 == v4
+        App (Var $ -79) [Var 3, Var 5]  -- v3 == v5
+      ])
+    ])])
 
 -- (/=)
 neqF :: Expr
@@ -1204,6 +1204,9 @@ functionsInfo =
     (-80, neqF, "(Data.Eq./=)"),
     
     (-7, reverseIterF, "reverse-iter"),
+    (-84, eqListF, ""),
+    (-85, eqNatF, ""),
+
     (-13, oddF, "odd")
   ]
 
