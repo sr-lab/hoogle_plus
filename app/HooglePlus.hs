@@ -183,7 +183,7 @@ synt = Synthesis {
   env_file_path_in    = defaultEnvPath  &= help ("Environment file path (default:" ++ (show defaultEnvPath) ++ ")"),
   app_max             = 6               &= help ("Maximum depth of an application term (default: 6)") &= groupname "Explorer parameters",
   log_                = 0               &= help ("Logger verboseness level (default: 0)") &= name "l",
-  sol_num             = 1               &= help ("Number of solutions need to find (default: 1)") &= name "cnt",
+  sol_num             = 35               &= help ("Number of solutions need to find (default: 1)") &= name "cnt",
   disable_higher_order        = False   &= help ("Disable higher order functions (default: False)"),
   use_refine          = TyGarQ          &= help ("Use abstract refinement or not (default: TyGarQ)"),
   stop_refine         = False           &= help ("Stop refine the abstraction cover after some threshold (default: False)"),
