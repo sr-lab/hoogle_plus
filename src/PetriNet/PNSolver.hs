@@ -294,7 +294,10 @@ refineSemantic env prog at = do
     -- add clone functions and add them into new transition set
     noClone <- getExperiment disableCopy
     cloneNames <- if noClone then return []
-                             else mapM addCloneFunction $ Set.toList splits
+                             else do 
+                                names <- mapM addCloneFunction (Set.toList splits)
+                                names' <- mapM addDeleteFunction (Set.toList splits)
+                                return $ names ++ names'
     -- update the higer order query arguments
     let hoArgs = Map.filter (isFunctionType . toMonotype) (env ^. arguments)
     mapM_ addMusters (Map.keys hoArgs)
@@ -415,6 +418,7 @@ initNet env = withTime ConstructionTime $ do
     unless noClone $ do
         allTy <- gets (HashMap.keys . view type2transition)
         mapM_ addCloneFunction allTy
+        mapM_ addDeleteFunction allTy
     -- add higher order query arguments
     let hoArgs = Map.filter (isFunctionType . toMonotype) (env ^. arguments)
     mapM_ addMusters (Map.keys hoArgs)
@@ -504,7 +508,8 @@ findProgram env dst st ps
         writeLog 2 "findProgram" $ text "calling findProgram"
         (path, st') <- findPath env dst st
         writeLog 2 "findProgram" $ text "unfiltered path:" <+> pretty path
-        let usefulTrans = filter skipClone path
+        --liftIO $ print $ text "unfiltered path:" <+> pretty path
+        let usefulTrans = filter (\x -> skipClone x && skipDelete x) path
         paths <- enumeratePath usefulTrans
         writeLog 2 "findProgram" $ text "all possible paths" <+> pretty paths
         checkUntilFail st' paths
@@ -541,6 +546,7 @@ findProgram env dst st ps
         return $ filter filterPaths (sequence allPaths)
 
     skipClone = not . isInfixOf "|clone"
+    skipDelete = not . isInfixOf "|delete"
 
     generateCode initialFormer src args sigs = do
         tgt <- gets (view targetType)
@@ -750,6 +756,15 @@ addCloneFunction ty = do
     modify $ over functionMap (HashMap.insert fname fc)
     updateTy2Tr fname ty
     return fname
+
+addDeleteFunction :: MonadIO m => AbstractSkeleton -> PNSolver m Id
+addDeleteFunction ty = do
+    let fname = show ty ++ "|delete"
+    let fc = FunctionCode fname [] [ty] []
+    modify $ over functionMap (HashMap.insert fname fc)
+    updateTy2Tr fname ty
+    return fname
+
 
 doRefine :: RefineStrategy -> Bool
 doRefine NoGar = False
