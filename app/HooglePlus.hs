@@ -274,6 +274,7 @@ executeSearch synquidParams searchParams query examples = do
     handleMessages ch (MesgP (program, stats, _)) = do
       when (logLevel > 0) $ printf "[writeStats]: %s\n" (show stats)
       printSolution program
+      printf "[writeStats]: %s\n" (show stats)
       hFlush stdout
       readChan ch >>= (handleMessages ch)
     handleMessages ch (MesgS debug) = do
