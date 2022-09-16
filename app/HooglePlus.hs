@@ -78,6 +78,7 @@ main = do
     case res of
         Synthesis { file
                   , exampleStr
+                  , outfile
                   , libs
                   , env_file_path_in
                   , app_max
@@ -116,11 +117,18 @@ main = do
                         }
             let synquidParams =
                     defaultSynquidParams {Main.envPath = env_file_path_in}
-            if exampleStr == "" 
-              then executeSearch synquidParams searchParams file Nothing
-              else case parseExamples exampleStr of
-                Left err -> putStrLn err
-                Right examples -> executeSearch synquidParams searchParams file (Just examples)
+            let examplesParsed = if exampleStr == "" 
+                                    then Nothing
+                                    else case parseExamples exampleStr of
+                                      Left err -> error err
+                                      Right examples -> (Just examples)
+            if not $ null outfile
+              then do
+                h <- openFile outfile WriteMode
+                executeSearch synquidParams searchParams file examplesParsed (Just h)
+                hClose h
+              else executeSearch synquidParams searchParams file examplesParsed Nothing
+            
         Generate {preset = (Just preset)} -> do
             precomputeGraph (getOptsFromPreset preset)
         Generate Nothing files pkgs mdls d ho pathToEnv hoPath -> do
@@ -170,7 +178,8 @@ data CommandLineArgs
         disable_copy_trans :: Bool,
         disable_blacklist :: Bool,
         disable_filter :: Bool,
-        exampleStr :: String
+        exampleStr :: String,
+        outfile :: String
       }
       | Generate {
         -- | Input
@@ -187,7 +196,8 @@ data CommandLineArgs
 
 synt = Synthesis {
   file                = ""              &= typFile &= argPos 0,
-  exampleStr        = ""              &= name "example" &= help ("Example to test"),
+  exampleStr          = ""              &= name "example" &= help ("Example to test"),
+  outfile             = ""              &= name "out" &= help ("File to output stats"),
   libs                = []              &= args &= typ "FILES",
   env_file_path_in    = defaultEnvPath  &= help ("Environment file path (default:" ++ (show defaultEnvPath) ++ ")"),
   app_max             = 6               &= help ("Maximum depth of an application term (default: 6)") &= groupname "Explorer parameters",
@@ -247,10 +257,9 @@ defaultSynquidParams = SynquidParams {
 precomputeGraph :: GenerationOpts -> IO ()
 precomputeGraph opts = generateEnv opts >>= writeEnv (Types.Generate.envPath opts)
 
-
 -- | Parse and resolve file, then synthesize the specified goals
-executeSearch :: SynquidParams -> SearchParams  -> String -> Maybe [Example] -> IO ()
-executeSearch synquidParams searchParams query examples = do
+executeSearch :: SynquidParams -> SearchParams  -> String -> Maybe [Example] -> Maybe Handle -> IO ()
+executeSearch synquidParams searchParams query examples handle = do
   env <- readEnv
   goal <- envToGoal env query
   solverChan <- newChan
@@ -272,10 +281,17 @@ executeSearch synquidParams searchParams query examples = do
 
     handleMessages ch (MesgClose _) = when (logLevel > 0) (putStrLn "Search complete") >> return ()
     handleMessages ch (MesgP (program, stats, _)) = do
+      -- write stdout
       when (logLevel > 0) $ printf "[writeStats]: %s\n" (show stats)
       printSolution program
-      printf "[writeStats]: %s\n" (show stats)
       hFlush stdout
+      -- write to log
+      when (isJust handle) $ do
+        let h' = fromJust handle
+        hPutStrLn h' (toHaskellSolution (show program))
+        hPutStrLn h' $ printf "%f %f %f" (ghcChecksTime stats) (matchTime stats) (totalTime stats)
+        hFlush h'
+      -- handle next message
       readChan ch >>= (handleMessages ch)
     handleMessages ch (MesgS debug) = do
       when (logLevel > 1) $ printf "[writeStats]: %s\n" (show debug)

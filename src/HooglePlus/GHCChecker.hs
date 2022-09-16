@@ -50,6 +50,7 @@ import Data.UUID.V4
 import Control.Concurrent.Chan
 import Control.Monad.Trans.State
 import Control.Concurrent
+import System.CPUTime (getCPUTime)
 
 -- FIXME remove some?
 import SymbolicMatch.Samples
@@ -147,41 +148,57 @@ check goal searchParams solverChan checkerChan examples = catch
 check_ :: MonadIO m => Goal -> SearchParams -> Chan Message -> Chan Message -> Maybe [Example] -> FilterTest m ()
 check_ goal searchParams solverChan checkerChan examples = do
     msg <- liftIO $ readChan solverChan
-    handleMessages solverChan checkerChan msg
+    handleMessages solverChan checkerChan (0.0 :: Double) (0.0 :: Double) msg
     return ()
     where
-        handleMessages solverChan checkChan msg =
+        handleMessages solverChan checkChan ghcTime matchTime msg =
             case msg of
                 (MesgP (program, stats, _)) -> do
                     -- executeCheck can return several programs given one 
                     -- program from the petri net (different lambdas)
-                    progs <- executeCheck program
+                    (progs, ghcTime', matchTime') <- executeCheck program 
                     state <- get
-                    foldr (\c r -> bypass (MesgP (c, stats, state)) >> r) next progs
+                    let ghcTime'' = ghcTime + ghcTime'
+                    let matchTime'' = matchTime + matchTime'
+                    let stats' = stats {ghcChecksTime = ghcTime'', matchTime = matchTime''}
+                    let next = (liftIO . readChan) solverChan >>= handleMessages solverChan checkerChan ghcTime'' matchTime''
+                    foldr (\c r -> bypass (MesgP (c, stats', state)) >> r) next progs
                 (MesgClose _) -> bypass msg
-                _ -> (bypass msg) >> next
+                _ -> (bypass msg) >> (liftIO . readChan) solverChan >>= handleMessages solverChan checkerChan ghcTime matchTime
 
             where
-                next = (liftIO . readChan) solverChan >>= handleMessages solverChan checkerChan
                 bypass message = liftIO $ writeChan checkerChan message
 
         (env, destType) = preprocessEnvFromGoal goal
         -- returns the program with symbols replaced
         executeCheck prog = do
             case examples of
-                Nothing -> do 
+                Nothing -> do
+                    start <- liftIO getCPUTime
                     ghcCheck <- runGhcChecks searchParams env destType prog
-                    return $ maybeToList ghcCheck
+                    end <- liftIO getCPUTime
+                    let diff = fromIntegral (end - start) / (10^12)
+                    return $ (maybeToList ghcCheck, diff, 0.0)
+                Just [] -> do 
+                    start <- liftIO getCPUTime
+                    ghcCheck <- runGhcChecks searchParams env destType prog
+                    end <- liftIO getCPUTime
+                    let diff = fromIntegral (end - start) / (10^12)
+                    return $ (maybeToList ghcCheck, diff, 0.0)
                 Just examples' -> do
+                    start <- liftIO getCPUTime
                     progs <- runExampleChecks searchParams env destType prog examples'
+                    end <- liftIO getCPUTime
+                    let diff = fromIntegral (end - start) / (10^12)
                     case progs of
-                        []  -> return []
-                        _:_ -> do 
+                        []  -> return ([], 0.0, diff)
+                        _:_ -> do
+                            start' <- liftIO getCPUTime
                             ghcChecks <- mapM (runGhcChecks searchParams env destType) progs
-                            return $ catMaybes ghcChecks
+                            end' <- liftIO getCPUTime
+                            let diff' = fromIntegral (end' - start') / (10^12)
+                            return $ (catMaybes ghcChecks, diff', diff)
                 
-            
-
 -- validate type signiture, run demand analysis, and run filter test
 -- checks the end result type checks; all arguments are used; and that the program will not immediately fail
 runGhcChecks :: MonadIO m => SearchParams -> Environment -> RType -> UProgram -> FilterTest m (Maybe UProgram)
