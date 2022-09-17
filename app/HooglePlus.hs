@@ -279,7 +279,9 @@ executeSearch synquidParams searchParams inStr = catch (do
     handleMessages ch (MesgP (out, stats, _)) = do
       when (logLevel > 0) $ printf "[writeStats]: %s\n" (show stats)
       -- printSolution program
-      printResult $ encodeWithPrefix out
+      putStrLn $ "Solution: " ++ (Types.IOFormat.solution $ head $ outCandidates out)
+      putStrLn $ show stats
+      -- printResult $ encodeWithPrefix out
       hFlush stdout
       readChan ch >>= (handleMessages ch)
     handleMessages ch (MesgS debug) = do
