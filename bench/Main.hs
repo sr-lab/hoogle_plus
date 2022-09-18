@@ -6,11 +6,7 @@ import System.Directory (removePathForcibly, createDirectory)
 exercises :: [(String, Maybe String)]
 exercises = [("[Int] -> [Int]", Just "[([[1, 2, 3]], [2, 3, 4])]")]
 
-
-execExercise :: String -> Maybe String -> String -> IO ( Double -- ghc
-                                                 , Double -- match
-                                                 , Double -- solver
-                                                 )
+execExercise :: String -> Maybe String -> String -> IO (Double, Double) -- match, total
 execExercise ty mexs log = do
   -- run exercise
 
@@ -22,7 +18,7 @@ execExercise ty mexs log = do
   statsLine <- hGetLine f -- read stats
   hClose f
   let stats = (map read $ words statsLine) :: [Double]
-  return (stats !! 0, stats !! 1, stats !! 2)
+  return (stats !! 0, stats !! 1)
   where
     command :: String -> Maybe String -> String
     command ty Nothing = printf "timeout 60s stack exec -- hplus \"%s\" --cnt=100 --out=%s" ty log

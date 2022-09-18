@@ -68,6 +68,8 @@ import Text.PrettyPrint.ANSI.Leijen (fill, column)
 
 import Data.List.Split
 
+import System.CPUTime (getCPUTime)
+
 programName = "hoogleplus"
 versionName = "0.1"
 releaseDate = fromGregorian 2019 3 10
@@ -260,13 +262,14 @@ precomputeGraph opts = generateEnv opts >>= writeEnv (Types.Generate.envPath opt
 -- | Parse and resolve file, then synthesize the specified goals
 executeSearch :: SynquidParams -> SearchParams  -> String -> Maybe [Example] -> Maybe Handle -> IO ()
 executeSearch synquidParams searchParams query examples handle = do
+  startTime <- getCPUTime
   env <- readEnv
   goal <- envToGoal env query
   solverChan <- newChan
   checkerChan <- newChan
   workerS <- forkIO $ synthesize searchParams goal solverChan (isJust examples)
   workerC <- forkIO $ check goal searchParams solverChan checkerChan examples
-  readChan checkerChan >>= (handleMessages checkerChan)
+  readChan checkerChan >>= (handleMessages checkerChan startTime)
   where
     logLevel = searchParams ^. explorerLogLevel
     readEnv = do
@@ -279,8 +282,8 @@ executeSearch synquidParams searchParams query examples handle = do
         Right env ->
           return env
 
-    handleMessages ch (MesgClose _) = when (logLevel > 0) (putStrLn "Search complete") >> return ()
-    handleMessages ch (MesgP (program, stats, _)) = do
+    handleMessages ch _ (MesgClose _) = when (logLevel > 0) (putStrLn "Search complete") >> return ()
+    handleMessages ch start (MesgP (program, stats, _)) = do
       -- write stdout
       when (logLevel > 0) $ printf "[writeStats]: %s\n" (show stats)
       printSolution program
@@ -288,18 +291,20 @@ executeSearch synquidParams searchParams query examples handle = do
       -- write to log
       when (isJust handle) $ do
         let h' = fromJust handle
+        now <- getCPUTime
+        let diff = fromIntegral (now - start) / (10^12)
         hPutStrLn h' (toHaskellSolution (show program))
-        hPutStrLn h' $ printf "%f %f %f" (ghcChecksTime stats) (matchTime stats) (totalTime stats)
+        hPutStrLn h' $ printf "%f %f" (matchTime stats) (diff :: Double)
         hFlush h'
       -- handle next message
-      readChan ch >>= (handleMessages ch)
-    handleMessages ch (MesgS debug) = do
+      readChan ch >>= (handleMessages ch start)
+    handleMessages ch start (MesgS debug) = do
       when (logLevel > 1) $ printf "[writeStats]: %s\n" (show debug)
-      readChan ch >>= (handleMessages ch)
-    handleMessages ch (MesgLog level tag msg) = do
+      readChan ch >>= (handleMessages ch start)
+    handleMessages ch start (MesgLog level tag msg) = do
       when (level <= logLevel) (do
         mapM (printf "[%s]: %s\n" tag) (lines msg)
         hFlush stdout)
-      readChan ch >>= (handleMessages ch)
+      readChan ch >>= (handleMessages ch start)
 
 pdoc = printDoc Plain

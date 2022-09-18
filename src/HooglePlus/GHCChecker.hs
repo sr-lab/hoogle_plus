@@ -148,23 +148,22 @@ check goal searchParams solverChan checkerChan examples = catch
 check_ :: MonadIO m => Goal -> SearchParams -> Chan Message -> Chan Message -> Maybe [Example] -> FilterTest m ()
 check_ goal searchParams solverChan checkerChan examples = do
     msg <- liftIO $ readChan solverChan
-    handleMessages solverChan checkerChan (0.0 :: Double) (0.0 :: Double) msg
+    handleMessages solverChan checkerChan (0.0 :: Double) msg
     return ()
     where
-        handleMessages solverChan checkChan ghcTime matchTime msg =
+        handleMessages solverChan checkChan matchTime msg =
             case msg of
                 (MesgP (program, stats, _)) -> do
                     -- executeCheck can return several programs given one 
                     -- program from the petri net (different lambdas)
-                    (progs, ghcTime', matchTime') <- executeCheck program 
+                    (progs, matchTime') <- executeCheck program 
                     state <- get
-                    let ghcTime'' = ghcTime + ghcTime'
                     let matchTime'' = matchTime + matchTime'
-                    let stats' = stats {ghcChecksTime = ghcTime'', matchTime = matchTime''}
-                    let next = (liftIO . readChan) solverChan >>= handleMessages solverChan checkerChan ghcTime'' matchTime''
+                    let stats' = stats {matchTime = matchTime''}
+                    let next = (liftIO . readChan) solverChan >>= handleMessages solverChan checkerChan matchTime''
                     foldr (\c r -> bypass (MesgP (c, stats', state)) >> r) next progs
                 (MesgClose _) -> bypass msg
-                _ -> (bypass msg) >> (liftIO . readChan) solverChan >>= handleMessages solverChan checkerChan ghcTime matchTime
+                _ -> (bypass msg) >> (liftIO . readChan) solverChan >>= handleMessages solverChan checkerChan matchTime
 
             where
                 bypass message = liftIO $ writeChan checkerChan message
@@ -174,30 +173,21 @@ check_ goal searchParams solverChan checkerChan examples = do
         executeCheck prog = do
             case examples of
                 Nothing -> do
-                    start <- liftIO getCPUTime
                     ghcCheck <- runGhcChecks searchParams env destType prog
-                    end <- liftIO getCPUTime
-                    let diff = fromIntegral (end - start) / (10^12)
-                    return $ (maybeToList ghcCheck, diff, 0.0)
+                    return $ (maybeToList ghcCheck, 0.0)
                 Just [] -> do 
-                    start <- liftIO getCPUTime
                     ghcCheck <- runGhcChecks searchParams env destType prog
-                    end <- liftIO getCPUTime
-                    let diff = fromIntegral (end - start) / (10^12)
-                    return $ (maybeToList ghcCheck, diff, 0.0)
+                    return $ (maybeToList ghcCheck, 0.0)
                 Just examples' -> do
                     start <- liftIO getCPUTime
                     progs <- runExampleChecks searchParams env destType prog examples'
                     end <- liftIO getCPUTime
                     let diff = fromIntegral (end - start) / (10^12)
                     case progs of
-                        []  -> return ([], 0.0, diff)
+                        []  -> return ([], diff)
                         _:_ -> do
-                            start' <- liftIO getCPUTime
                             ghcChecks <- mapM (runGhcChecks searchParams env destType) progs
-                            end' <- liftIO getCPUTime
-                            let diff' = fromIntegral (end' - start') / (10^12)
-                            return $ (catMaybes ghcChecks, diff', diff)
+                            return $ (catMaybes ghcChecks, diff)
                 
 -- validate type signiture, run demand analysis, and run filter test
 -- checks the end result type checks; all arguments are used; and that the program will not immediately fail

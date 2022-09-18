@@ -55,8 +55,6 @@ makeLenses ''SearchParams
 
 -- for Petri-net solver
 data TimeStatistics = TimeStatistics {
-  -- times after solver
-  ghcChecksTime :: Double,
   matchTime :: Double,
   -- solver times
   encodingTime :: Double,
@@ -74,7 +72,7 @@ data TimeStatistics = TimeStatistics {
   duplicateSymbols :: [(Int, Int, Int)]
 } deriving(Show, Eq)
 
-emptyTimeStats = TimeStatistics 0 0 0 0 0 0 0 0 0 0 0 Map.empty Map.empty []
+emptyTimeStats = TimeStatistics 0 0 0 0 0 0 0 0 0 0 Map.empty Map.empty []
 
 data TimeStatUpdate
   = ConstructionTime
