@@ -161,7 +161,8 @@ check_ goal searchParams solverChan checkerChan examples = do
                     let matchTime'' = matchTime + matchTime'
                     let stats' = stats {matchTime = matchTime''}
                     let next = (liftIO . readChan) solverChan >>= handleMessages solverChan checkerChan matchTime''
-                    foldr (\c r -> bypass (MesgP (c, stats', state)) >> r) next progs
+                    mapM_ (\c -> bypass (MesgP (c, stats', state))) progs
+                    next
                 (MesgClose _) -> bypass msg
                 _ -> (bypass msg) >> (liftIO . readChan) solverChan >>= handleMessages solverChan checkerChan matchTime
 
