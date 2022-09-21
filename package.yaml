@@ -100,6 +100,16 @@ executables:
     dependencies:
     - HooglePlus
 
+benchmarks:
+  bench:
+    main: Main.hs
+    source-dirs: bench
+    ghc-options:
+    - -rtsopts
+    - -O2
+    dependencies:
+    - HooglePlus
+
 tests:
   spec:
     main: Spec.hs
