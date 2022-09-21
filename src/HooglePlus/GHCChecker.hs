@@ -434,6 +434,7 @@ runExampleChecks params env goalType prog examples = do
                 def (ArgTypeList _) = "[]"
                 def (ArgTypeTuple ts) = let defs = map def ts in 
                     "(" ++ intercalate ", " defs ++ ")"
+                def (Polymorphic name) = "undefined"
                 def t = error $ "Default value missing for type " ++ show t
 
 -- ensures that the program type-checks
