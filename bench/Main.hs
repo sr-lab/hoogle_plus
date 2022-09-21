@@ -42,6 +42,7 @@ printStats h (name, Just tm) = hPutStrLn h $ name ++ ": " ++ show tm ++ " second
 
 main :: IO ()
 main = do
+  readCreateProcessWithExitCode (shell "stack exec -- hplus generate --preset=partialfunctions") ""
   removePathForcibly logsDir
   createDirectory logsDir
   stats <- mapM execExercise exercises
