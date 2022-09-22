@@ -298,6 +298,7 @@ executeSearch synquidParams searchParams handle inStr = catch (do
         let diff = fromIntegral (now - start) / (10^12)
         hPutStrLn h (Types.IOFormat.solution $ head $ outCandidates out)
         hPutStrLn h (show diff)
+        hFlush h
       printResult $ encodeWithPrefix out
       hFlush stdout
       readChan ch >>= (handleMessages ch start)
