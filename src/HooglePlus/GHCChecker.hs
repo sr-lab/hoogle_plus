@@ -176,19 +176,30 @@ check_ goal searchParams solverChan checkerChan examples = do
                 Nothing -> do
                     ghcCheck <- runGhcChecks searchParams env destType prog
                     return $ (maybeToList ghcCheck, 0.0)
-                Just [] -> do 
-                    ghcCheck <- runGhcChecks searchParams env destType prog
-                    return $ (maybeToList ghcCheck, 0.0)
+                Just [] -- when examples flags exists but is [], the symbols exist and won't be replaced
+                        -- do not wast time on GHC
+                    | hasSymbol prog -> return ([], 0.0)
+                    | otherwise -> do 
+                        ghcCheck <- runGhcChecks searchParams env destType prog
+                        return $ (maybeToList ghcCheck, 0.0)
                 Just examples' -> do
                     start <- liftIO getCPUTime
                     progs <- runExampleChecks searchParams env destType prog examples'
                     end <- liftIO getCPUTime
                     let diff = fromIntegral (end - start) / (10^12)
-                    case progs of
+                    let progs' = filter (not . hasSymbol) progs
+                    case progs' of
                         []  -> return ([], diff)
                         _:_ -> do
-                            ghcChecks <- mapM (runGhcChecks searchParams env destType) progs
+                            ghcChecks <- mapM (runGhcChecks searchParams env destType) progs'
                             return $ (catMaybes ghcChecks, diff)
+            where
+                hasSymbol :: UProgram -> Bool
+                hasSymbol prog = case content prog of
+                    PSymbol id -> any (\(s, _) -> s `isInfixOf` id) symbolsInfo
+                    PApp id args -> 
+                        any (\(s, _) -> s `isInfixOf` id) symbolsInfo || any hasSymbol args
+                    _ -> error "Solution not expexted to have other than PSym and PApp."
                 
 -- validate type signiture, run demand analysis, and run filter test
 -- checks the end result type checks; all arguments are used; and that the program will not immediately fail

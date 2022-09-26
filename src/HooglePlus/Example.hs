@@ -6,7 +6,8 @@ module HooglePlus.Example ( Example(..)
                           , isSymbolWithPrefix
                           , isSymbol
                           , lookupSymType
-                          , removeModulePrefix) where
+                          , removeModulePrefix
+                          , symbolsInfo) where
 
 import SymbolicMatch.Match
 import SymbolicMatch.Expr
