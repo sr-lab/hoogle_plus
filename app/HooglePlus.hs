@@ -53,7 +53,7 @@ import Language.Haskell.Exts (Decl(TypeSig))
 import Data.Map ((!))
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Data.Maybe (mapMaybe, fromJust)
+import Data.Maybe (mapMaybe, fromJust, isJust)
 import Distribution.PackDeps
 import Text.Parsec hiding (State)
 import Text.Parsec.Indent
@@ -65,6 +65,8 @@ import qualified Text.PrettyPrint.ANSI.Leijen as PP
 import Text.PrettyPrint.ANSI.Leijen (fill, column)
 
 import Data.List.Split
+
+import System.CPUTime (getCPUTime)
 
 programName = "hoogleplus"
 versionName = "0.1"
@@ -92,6 +94,7 @@ main = do
                   , disable_copy_trans
                   , disable_blacklist
                   , disable_filter
+                  , outfile
                   } -> do
             let searchParams =
                     defaultSearchParams
@@ -113,7 +116,14 @@ main = do
                         }
             let synquidParams =
                     defaultSynquidParams {Main.envPath = env_file_path_in}
-            executeSearch synquidParams searchParams file
+            
+            if not $ null outfile
+              then do
+                h <- openFile outfile WriteMode
+                executeSearch synquidParams searchParams file (Just h)
+                hClose h
+              else executeSearch synquidParams searchParams file Nothing
+            
         Generate {preset = (Just preset)} -> do
             precomputeGraph (getOptsFromPreset preset)
         Generate Nothing files pkgs mdls d ho pathToEnv hoPath -> do
@@ -162,7 +172,8 @@ data CommandLineArgs
         disable_relevancy :: Bool,
         disable_copy_trans :: Bool,
         disable_blacklist :: Bool,
-        disable_filter :: Bool
+        disable_filter :: Bool,
+        outfile :: String
       }
       | Generate {
         -- | Input
@@ -179,6 +190,7 @@ data CommandLineArgs
 
 synt = Synthesis {
   file                = ""              &= typFile &= argPos 0,
+  outfile             = ""              &= name "out" &= help ("File to output stats"),
   libs                = []              &= args &= typ "FILES",
   env_file_path_in    = defaultEnvPath  &= help ("Environment file path (default:" ++ (show defaultEnvPath) ++ ")"),
   app_max             = 6               &= help ("Maximum depth of an application term (default: 6)") &= groupname "Explorer parameters",
@@ -240,15 +252,16 @@ precomputeGraph opts = generateEnv opts >>= writeEnv (Types.Generate.envPath opt
 
 
 -- | Parse and resolve file, then synthesize the specified goals
-executeSearch :: SynquidParams -> SearchParams  -> String -> IO ()
-executeSearch synquidParams searchParams query = do
+executeSearch :: SynquidParams -> SearchParams  -> String -> Maybe Handle -> IO ()
+executeSearch synquidParams searchParams query handle = do
+  startTime <- getCPUTime
   env <- readEnv
   goal <- envToGoal env query
   solverChan <- newChan
   checkerChan <- newChan
   workerS <- forkIO $ synthesize searchParams goal solverChan
   workerC <- forkIO $ check goal searchParams solverChan checkerChan
-  readChan checkerChan >>= (handleMessages checkerChan)
+  readChan checkerChan >>= (handleMessages checkerChan startTime)
   where
     logLevel = searchParams ^. explorerLogLevel
     readEnv = do
@@ -261,19 +274,28 @@ executeSearch synquidParams searchParams query = do
         Right env ->
           return env
 
-    handleMessages ch (MesgClose _) = when (logLevel > 0) (putStrLn "Search complete") >> return ()
-    handleMessages ch (MesgP (program, stats, _)) = do
+    handleMessages ch _ (MesgClose _) = when (logLevel > 0) (putStrLn "Search complete") >> return ()
+    handleMessages ch start (MesgP (program, stats, _)) = do
       when (logLevel > 0) $ printf "[writeStats]: %s\n" (show stats)
       printSolution program
       hFlush stdout
-      readChan ch >>= (handleMessages ch)
-    handleMessages ch (MesgS debug) = do
+
+      when (isJust handle) $ do
+        let h' = fromJust handle
+        now <- getCPUTime
+        let diff = fromIntegral (now - start) / (10^12)
+        hPutStrLn h' (toHaskellSolution (show program))
+        hPutStrLn h' $ printf "%f" (diff :: Double)
+        hFlush h'
+      
+      readChan ch >>= (handleMessages ch start)
+    handleMessages ch start (MesgS debug) = do
       when (logLevel > 1) $ printf "[writeStats]: %s\n" (show debug)
-      readChan ch >>= (handleMessages ch)
-    handleMessages ch (MesgLog level tag msg) = do
+      readChan ch >>= (handleMessages ch start)
+    handleMessages ch start (MesgLog level tag msg) = do
       when (level <= logLevel) (do
         mapM (printf "[%s]: %s\n" tag) (lines msg)
         hFlush stdout)
-      readChan ch >>= (handleMessages ch)
+      readChan ch >>= (handleMessages ch start)
 
 pdoc = printDoc Plain
