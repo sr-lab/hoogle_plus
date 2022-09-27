@@ -20,7 +20,7 @@ instance ToJSON Example
 instance FromJSON Example
 
 logsDir :: String
-logsDir = "bench-logs-ext"
+logsDir = "bench-logs-extension"
 
 resultsFile :: String
 resultsFile = "results.log"
