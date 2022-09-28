@@ -30,7 +30,7 @@ count = 100
 
 exercises :: [(String, String, [Example])]
 exercises = [
-  ("firstRight", "[Either a b] -> Either a b", []),
+  {-("firstRight", "[Either a b] -> Either a b", []),
   ("firstKey", "[(a, b)] -> a", []),
   ("flatten", "[[[a]]] -> [a]", []),
   ("repl-funcs", "(a -> b) -> Int -> [a -> b]", []),
@@ -73,24 +73,24 @@ exercises = [
   ("firstMaybe", "[Maybe a] -> a", []),
   ("mbToEither", "Maybe a -> b -> Either a b", []),
   ("pred-match", "[a] -> (a -> Bool) -> Int", []),
-  ("singleList", "Int -> [Int]", []),
+  ("singleList", "Int -> [Int]", []),-}
   -- new exercises
   ("mapAdd", "[Int] -> [Int]", [Example {inputs = ["[1, 2, 3]"], output = "[2, 3, 4]"}]),
-  ("mapSquare", "[Int] -> [Int]", [Example {inputs = ["[1, 2, 3]"], output = "[1, 4, 9]"}])
+  ("mapSquare", "[Int] -> [Int]", [Example {inputs = ["[1, 2, 3]"], output = "[1, 4, 9]"}]),
   ("appendConst", "[Int] -> [Int]", [Example {inputs = ["[1, 2, 3]"], output = "[1, 2, 3, 4]"}]),
   ("filterDiff", "[Int] -> [Int]", [Example {inputs = ["[1, 2, 3]"], output = "[1, 3]"}]),
   
   -- stackoverflow
-  ("listIntersect", "[Int] -> [Int] -> [Int]", [Example {inputs = ["[0, 2, 4]", "[2, 4, 6"], output = "[2, 4]"}])
+  ("listIntersect", "[Int] -> [Int] -> [Int]", [Example {inputs = ["[0, 2, 4]", "[2, 4, 6"], output = "[2, 4]"}]),
   ("indexConst", "[Int] -> Int", [Example {inputs = ["[1, 2, 3]"], output = "3"}]),
   ("allGreaterThan", "[Int] -> Bool", [Example {inputs = ["[2, 3, 4]"], output = "Data.Bool.True"}, 
                               Example {inputs = ["[2, 1, 4]"], output = "Data.Bool.False"}]),
-  ("dropConst", "[Int] -> [Int]", [Example {inputs = ["[1, 2, 3, 4, 5"], output = "[3, 4, 5]"}]),
-  ("filterGreaterThan", "[Int] -> [Int]", [Example {inputs = ["[2, 3, 4, 5, 6]"], output = "[5, 6]"}]),
+  ("dropConst", "[Int] -> [Int]", [Example {inputs = ["[1, 2, 3, 4, 5]"], output = "[3, 4, 5]"}]),
+  ("filterGreaterThan", "[Int] -> [Int]", [Example {inputs = ["[2, 0, 1, 3]"], output = "[2, 3]"}]),
   ("filterPairs", "[(Int, Int)] -> [(Int, Int)]", [Example {inputs = ["[(1, 2), (3, 3), (4, 5)]"], output = "[(3, 3)"}]),
   ("filterEq", "[Int] -> [Int]", [Example {inputs = ["[1, 2, 1, 3, 4, 4]"], output = "[1, 1]"}]),
-  ("replicateConst", "[Int]", [Example {inputs = [], output = "[3, 3, 3, 3, 3"}]),
-  ("addElemsTwoLists", "[Int] -> [Int] -> [Int]", [Example {inputs = ["[1, 2, 3]", "[3, 4, 5"], output = "[4, 6, 8]"}])
+  ("replicateConst", "[Int]", [Example {inputs = [], output = "[3, 3, 3, 3, 3]"}]),
+  ("addElemsTwoLists", "[Int] -> [Int] -> [Int]", [Example {inputs = ["[1, 2, 3]", "[3, 4, 5]"], output = "[4, 6, 8]"}])
   ]
 
 execExercisesPar :: Int -> [(String, String, [Example])] -> IO ()

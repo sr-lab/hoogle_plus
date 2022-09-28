@@ -211,9 +211,9 @@ runGhcChecks params env goalType prog  = let
     expr = body ++ " :: " ++ funcSig
     disableDemand = _disableDemand params
     disableFilter = _disableFilter params
-    in do
+    in do -- when there are no arguments, the strictness is unnecesssary and raises error
         typeCheckResult <- if disableDemand then return (Right True) else liftIO $ runInterpreter $ checkType expr modules
-        strictCheckResult <- if disableDemand then return True else liftIO $ checkStrictness tyclassCount body funcSig modules
+        strictCheckResult <- if disableDemand || null argList then return True else liftIO $ checkStrictness tyclassCount body funcSig modules
         filterCheckResult <- if disableFilter then return True else runChecks body funcSig modules
         case typeCheckResult of
             Left err -> do 
@@ -246,59 +246,71 @@ runExampleChecks :: MonadIO m
                  -> UProgram 
                  -> [Example]
                  -> FilterTest m [UProgram]
-runExampleChecks params env goalType prog examples = do 
-    case Match.matchPairsPretty 150 pairs functionsEnv of
-        Left err -> 
-            case err of 
-                Match.Exception msg -> do 
-                    liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match (exception on match: " ++ msg ++ ")."
-                    return []
-                Match.Mismatch -> do
-                    liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match (mismatch)."
-                    return []
-                Match.DepthReached -> do
-                    liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match (max depth reached)."
-                    return []
-        Right cs -> do
-            -- replace all non-function symbols built by match
-            let prog'' = replaceSymsInProg cs progWithGoodSymNames
-            
-            -- get symbols of the remaining symbols (functions) if any
-            let (_, _, lambda, _) = extractSolution env goalType prog''
-            let lambda' = T.unpack $ T.replace (T.pack "Sym") (T.pack "_Sym") (T.pack lambda)
-            let expr = lambda' ++ " :: " ++ funcSig
-            mbsts <- getHolesTypes expr modules "Sym"
-            
-            case mbsts of
-                -- error getting symbols types, probably compilation error
-                Nothing -> do 
-                    liftIO $ putStrLn ("Test \'" ++ show prog ++ "\': rejected by match (compilation)")
-                    return []
-                Just [] -> do
-                    prog''' <- replaceWilcards prog''
-                    case prog''' of
-                        Just prog'''' -> return [prog'''']
-                        Nothing -> do
-                            liftIO $ putStrLn ("Test \'" ++ show prog ++ "\': rejected by match (compilation)")
-                            return []
-                Just sts -> do
-                    -- if any symbol is not a function, it should be replace by match, before...
-                    when (not (allFunTys sts)) $ error "Non function symbol found after match"
-                    -- FIXME: should set seed for widlcards in lams, otherwise may colide
-                    -- synthesize lambdas for the function symbols and replace
-                    case synthLambdas (_symsToLinearSynth env) sts argList cs of
-                        [] -> do
-                            liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match (synthesizing lambdas)."
-                            return []
-                        lams@(_:_) -> do
-                            let progsWithLams = [replaceLamsInProg l prog'' | l <- lams]
-                            mbsProgs <- mapM replaceWilcards progsWithLams
-                            return $ catMaybes mbsProgs
+runExampleChecks params env goalType prog examples = do
+    if (not . checkFunctionsPresent) prog 
+        then do
+            liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match (functions not supported by Match)."
+            return []
+        else case Match.matchPairsPretty 150 pairs functionsEnv of
+            Left err -> 
+                case err of 
+                    Match.Exception msg -> do 
+                        liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match (exception on match: " ++ msg ++ ")."
+                        return []
+                    Match.Mismatch -> do
+                        liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match (mismatch)."
+                        return []
+                    Match.DepthReached -> do
+                        liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match (max depth reached)."
+                        return []
+            Right cs -> do
+                -- replace all non-function symbols built by match
+                let prog'' = replaceSymsInProg cs progWithGoodSymNames
+                
+                -- get symbols of the remaining symbols (functions) if any
+                let (_, _, lambda, _) = extractSolution env goalType prog''
+                let lambda' = T.unpack $ T.replace (T.pack "Sym") (T.pack "_Sym") (T.pack lambda)
+                let expr = lambda' ++ " :: " ++ funcSig
+                mbsts <- getHolesTypes expr modules "Sym"
+                
+                case mbsts of
+                    -- error getting symbols types, probably compilation error
+                    Nothing -> do 
+                        liftIO $ putStrLn ("Test \'" ++ show prog ++ "\': rejected by match (compilation)")
+                        return []
+                    Just [] -> do
+                        prog''' <- replaceWilcards prog''
+                        case prog''' of
+                            Just prog'''' -> return [prog'''']
+                            Nothing -> do
+                                liftIO $ putStrLn ("Test \'" ++ show prog ++ "\': rejected by match (compilation)")
+                                return []
+                    Just sts -> do
+                        -- if any symbol is not a function, it should be replace by match, before...
+                        when (not (allFunTys sts)) $ error "Non function symbol found after match"
+                        -- FIXME: should set seed for widlcards in lams, otherwise may colide
+                        -- synthesize lambdas for the function symbols and replace
+                        case synthLambdas (_symsToLinearSynth env) sts argList cs of
+                            [] -> do
+                                liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match (synthesizing lambdas)."
+                                return []
+                            lams@(_:_) -> do
+                                let progsWithLams = [replaceLamsInProg l prog'' | l <- lams]
+                                mbsProgs <- mapM replaceWilcards progsWithLams
+                                return $ catMaybes mbsProgs
     where
         (modules, funcSig, _, argList) = extractSolution env goalType prog
 
         progWithGoodSymNames :: UProgram
         progWithGoodSymNames = changeSymbolsNames $ removeTc prog
+
+        -- SymbolicMatch does not support all functions, and raises an error
+        -- we prefer to avoid error and skip to the next
+        checkFunctionsPresent :: UProgram -> Bool
+        checkFunctionsPresent Program {content = (PSymbol _)} = True -- FIXME lambda functions as arguments
+        checkFunctionsPresent Program {content = (PApp id args)}
+            | isJust $ lookupFun id = all checkFunctionsPresent args
+            | otherwise = False
         
         pairs :: [(Expr.Expr, Expr.Expr)]
         pairs = let argsNames = map fst argList in 
@@ -407,7 +419,7 @@ runExampleChecks params env goalType prog examples = do
                 matchFn :: Int -> Expr.Expr -> Either Match.MatchError [(Int, [Expr.Expr], Expr.Expr)]
                 matchFn si lam = let
                     pairs' = map (\(src, dst) -> (Expr.replace src (Expr.Sym si) lam, dst)) pairs in
-                        Match.matchPairsPretty 300 pairs' functionsEnv
+                        Match.matchPairsPretty 400 pairs' functionsEnv
         
         -- try replace wildcard generated by match with default values
         replaceWilcards :: MonadIO m => UProgram -> FilterTest m (Maybe UProgram)
@@ -439,6 +451,7 @@ runExampleChecks params env goalType prog examples = do
                 -- get a default value for each type as a string
                 def :: ArgumentType -> String
                 def (Concrete "Int") = "0"
+                def (Concrete "Integer") = "0"
                 def (Concrete "Bool") = "False"
                 def (ArgTypeApp (Concrete "Maybe") _) = "Nothing"
                 def (ArgTypeApp (Concrete "Either") t) = "(Left " ++ def t ++ ")"

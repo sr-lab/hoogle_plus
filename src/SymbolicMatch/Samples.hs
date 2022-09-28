@@ -1080,6 +1080,69 @@ foldrF =
       ]
     )
 
+foldr1F :: Expr
+foldr1F =
+  Lam
+    [0, 1] -- f: 0, l: 1
+    (Case
+      (Var 1)
+      [
+        Alt "Nil" [] (DataC "Error" []), -- h: 2, t: 3
+        Alt "Cons" [2, 3] (Case (Var 3) [
+          Alt "Nil" [] (Var 2),
+          Alt "Cons" [4, 5] (App (Var 0) [Var 2, App (Var $ -91) [Var 0, Var 3]])
+        ])
+      ]
+    )
+
+foldlF :: Expr
+foldlF =
+  Lam
+    [0, 1, 2] -- f: 0, d: 1, l:2
+    (Case
+      (Var 2)
+      [
+        Alt "Nil" [] (Var 1), -- h: 3, t: 4
+        Alt "Cons" [3, 4] (App (Var $ -86) [Var 0, App (Var 0) [Var 1, Var 3], Var 4])
+      ]
+    )
+
+foldl1F :: Expr
+foldl1F =
+  Lam
+    [0, 1] -- f: 0, l:1
+    (Case
+      (Var 1)
+      [
+        Alt "Nil" [] (DataC "Error" []), -- h: 2, t: 3
+        Alt "Cons" [2, 3] (Case (Var 3) [
+            Alt "Nil" [] (Var 2), 
+            -- l = 2:(4:5)
+            Alt "Cons" [4, 5] (App (Var (-89)) [Var 0, DataC "Cons" [App (Var 0) [Var 2, Var 4], Var 5]])
+          ])
+      ]
+    )
+
+takeWhileF :: Expr
+takeWhileF = Lam [0, 1] -- 0: f, 1: l
+  (Case (Var 1) [
+    Alt "Nil" [] listNil,
+    Alt "Cons" [2, 3] (Case (App (Var 0) [Var 2]) [
+      Alt "Data.Bool.True" [] (cons (Var 2) (App (Var $ -90) [Var 0, Var 3])),
+      Alt "Data.Bool.False" [] listNil
+    ])
+  ])
+
+dropWhileF :: Expr
+dropWhileF = Lam [0, 1] -- 0: f, 1: l
+  (Case (Var 1) [
+    Alt "Nil" [] listNil,
+    Alt "Cons" [2, 3] (Case (App (Var 0) [Var 2]) [
+      Alt "Data.Bool.True" [] (App (Var $ -92) [Var 0, Var 3]),
+      Alt "Data.Bool.False" [] (Var 1)
+    ])
+  ])
+
 oddF :: Expr
 oddF =
   Lam 
@@ -1110,6 +1173,8 @@ functionsInfo =
     (-9, filterF, "GHC.List.filter"),
     (-10, takeF, "GHC.List.take"),
     (-12, foldrF, "GHC.List.foldr"),
+    (-88, foldrF, "GHC.List.foldr'"),
+    (-91, foldr1F, "GHC.List.foldr1"),
     (-14, zipF, "GHC.List.zip"),
     (-15, replicateF, "GHC.List.replicate"),
     (-17, lastF, "GHC.List.last"),
@@ -1133,6 +1198,11 @@ functionsInfo =
     (-81, elemF, "GHC.List.elem"),
     (-82, notElemF, "GHC.List.notElem"),
     (-83, lookupF, "GHC.List.lookup"),
+    (-86, foldlF, "GHC.List.foldl"),
+    (-87, foldlF, "GHC.List.foldl'"),
+    (-89, foldl1F, "GHC.List.foldl1"),
+    (-90, takeWhileF, "GHC.List.takeWhile"),
+    (-92, dropWhileF, "GHC.List.dropWhile"),
 
     -- Data.Maybe
     (-56, nothingF, "Data.Maybe.Nothing"),
