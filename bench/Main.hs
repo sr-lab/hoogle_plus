@@ -79,8 +79,10 @@ exercises = [
   ("mapSquare", "[Int] -> [Int]", [Example {inputs = ["[1, 2, 3]"], output = "[1, 4, 9]"}]),
   ("appendConst", "[Int] -> [Int]", [Example {inputs = ["[1, 2, 3]"], output = "[1, 2, 3, 4]"}]),
   ("filterDiff", "[Int] -> [Int]", [Example {inputs = ["[1, 2, 3]"], output = "[1, 3]"}]),
+  ("getFirstOnes", "[Int] -> [Int]", [Example {inputs = ["[1, 1, 0, 1, 2]"], output = "[1, 1]"}]),
   
   -- stackoverflow
+  ("removeFirstOnes", "[Int] -> [Int]", [Example {inputs = ["[1, 1, 0, 1, 2]"], output = "[0, 1, 2]"}]),
   ("listIntersect", "[Int] -> [Int] -> [Int]", [Example {inputs = ["[0, 2, 4]", "[2, 4, 6"], output = "[2, 4]"}]),
   ("indexConst", "[Int] -> Int", [Example {inputs = ["[1, 2, 3]"], output = "3"}]),
   ("allGreaterThan", "[Int] -> Bool", [Example {inputs = ["[2, 3, 4]"], output = "Data.Bool.True"}, 
