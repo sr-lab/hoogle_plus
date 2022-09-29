@@ -1,53 +1,69 @@
 {-# LANGUAGE LambdaCase #-}
-module SymbolicMatch.Eval (eval, choosePoly) where
+module SymbolicMatch.Eval (eval, choosePoly, evalMany) where
 
 import qualified SymbolicMatch.State as S
 import SymbolicMatch.Expr
 
 -- evalutes everything possible without symbolic branches
-eval :: S.State -> Expr -> Expr
+eval :: S.State -> Expr -> Either String Expr
 
 eval st sym@(Sym n) = case S.getAssign n st of
-  Nothing -> sym
+  Nothing -> Right sym
   Just ex -> eval st ex
 
-eval _ lam@(Lam _ _) = lam
+eval _ lam@(Lam _ _) = Right lam
 
-eval st poly@(Poly _) = poly
+eval st poly@(Poly _) = Right poly
 
-eval st (Var n) = eval st $ S.unsafeGet n st $ "Variable " ++ show n ++ " not found."
+eval st (Var n) = case S.get n st of
+  Nothing -> Left $ "Variable " ++ show n ++ " not found."
+  Just v -> eval st v
 
-eval st (DataC n args) = DataC n (map (eval st) args)
+eval st (DataC n args) = case evalMany st args of
+  Left err -> Left err
+  Right args -> Right $ DataC n args
 
-eval _ lit@(Lit _) = lit
+eval _ lit@(Lit _) = Right lit
 
 eval st (App e es) =
   case eval st e of
-    (Lam ps exp) -> 
-      let es' = map (eval st) es
-          st' = S.bindAll (zip ps es') st in
-        eval st' exp
-    (Poly table) ->
-      let es' = map (eval st) es
-          lam = choosePoly table es' in
-        eval st (App lam es')        
-    o -> App o $ map (eval st) es
+    Right (Lam ps exp) -> do
+      es' <- evalMany st es
+      let st' = S.bindAll (zip ps es') st
+      eval st' exp
+    Right (Poly table) -> do
+      es' <- evalMany st es
+      let lam = choosePoly table es'
+      eval st (App lam es')        
+    Right o -> do
+      es' <- evalMany st es
+      Right $ App o es'
+    Left err -> Left err
 
 eval st (Case e alts) =
   case eval st e of
-    (DataC "Error" []) -> DataC "Error" []
-    (DataC s exs) -> searchAlt s exs alts
-    o -> Case o alts
+    Right (DataC "Error" []) -> Right $ DataC "Error" []
+    Right (DataC s exs) -> searchAlt s exs alts
+    Right o -> Right $ Case o alts
+    Left err -> Left err
   where 
-    searchAlt :: String -> [Expr] -> [Alt] -> Expr
-    searchAlt n es [] = error $ "No alternative found - " ++ n ++ show es ++ "; " ++ show alts
+    searchAlt :: String -> [Expr] -> [Alt] -> Either String Expr
+    searchAlt n es [] = Left $ "No alternative found - " ++ n ++ show es ++ "; " ++ show alts
     searchAlt n es ((Alt s ss body):t)
       | n == s && length es == length ss = 
         let st' = S.bindAll (zip ss es) st in
           eval st' body
       | otherwise = searchAlt n es t
 
-eval _ w@WildCard = w
+eval _ w@WildCard = Right w
+
+evalMany :: S.State -> [Expr] -> Either String [Expr]
+evalMany st [] = Right []
+evalMany st (e:es) = case eval st e of
+  Left s -> Left s
+  Right ex -> case evalMany st es of
+    Left s -> Left s
+    Right exs -> Right (ex:exs)
 
 -- given a poly table and the arguments, choose lambda
 -- arguments must be evaluated!

@@ -178,7 +178,9 @@ check_ goal searchParams solverChan checkerChan examples = do
                     return $ (maybeToList ghcCheck, 0.0)
                 Just [] -- when examples flags exists but is [], the symbols exist and won't be replaced
                         -- do not wast time on GHC
-                    | hasSymbol prog -> return ([], 0.0)
+                    | hasSymbol prog -> do
+                        liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected (symbol not replaced)."
+                        return ([], 0.0)
                     | otherwise -> do 
                         ghcCheck <- runGhcChecks searchParams env destType prog
                         return $ (maybeToList ghcCheck, 0.0)
@@ -376,7 +378,7 @@ runExampleChecks params env goalType prog examples = do
         getHolesTypes expr modules prefix = do
             res <- liftIO $ runInterpreter $ checkType expr modules
             case res of 
-                Left err -> case err of 
+                Left err -> case err of
                     WontCompile msgs -> let msgAsTexts = map (\(GhcError m) -> T.pack m) msgs in
                         if all (\m -> T.pack "Found hole" `T.isInfixOf` m) msgAsTexts
                             then return $ Just $ mapMaybe (extractType (T.pack prefix)) msgAsTexts

@@ -11,7 +11,7 @@ import SymbolicMatch.Expr ( Expr(..), Alt(..), final, PolyTable, PolyAlt, Rule(.
 import qualified SymbolicMatch.Constr as C
 import qualified SymbolicMatch.State as S
 import qualified SymbolicMatch.Env as E
-import SymbolicMatch.Eval ( eval, choosePoly )
+import SymbolicMatch.Eval ( eval, choosePoly, evalMany )
 import SymbolicMatch.Constr (pretty, prettyAll)
 
 data MatchError = DepthReached
@@ -108,27 +108,33 @@ match (App e es) state dst ct
       case e of
         (Lam ps e') ->
           if length es == length ps
-            then let es' = map (eval state) es in
-              if all final es'
-                then let state' = S.bindAll (zip ps es') state
-                         ct' = \st -> ct (S.newEnv st (S.env state)) in -- FIXME and what about remove the generated symbols
-                    match e' (S.incDepth state') dst ct'
-                else let (syms, state') = S.genSyms (length es') state
-                         ct' = \st -> matchApp es syms (S.newEnv st (S.env state)) ct in
-                    match (App e syms) state' dst ct'
+            then do
+              case evalMany state es of
+                Left s -> Left (Exception s)
+                Right es' -> 
+                  if all final es'
+                    then let state' = S.bindAll (zip ps es') state
+                             ct' = \st -> ct (S.newEnv st (S.env state)) in -- FIXME and what about remove the generated symbols
+                        match e' (S.incDepth state') dst ct'
+                    else let (syms, state') = S.genSyms (length es') state
+                             ct' = \st -> matchApp es syms (S.newEnv st (S.env state)) ct in
+                        match (App e syms) state' dst ct'
             else Left $ Exception $ "argument and param mismatch: " ++ show e ++ ";;;" ++ show es
         (Var n) ->
           let e' = S.unsafeGet n state ("App variable " ++ show n ++ " not found") in
             match (App e' es) (S.incDepth state) dst ct
-        (Sym n) -> -- expects that the arguments of symbols applications does not have branches
-          let es' = map (eval state) es in
+        (Sym n) -> do -- expects that the arguments of symbols applications does not have branches
+          case evalMany state es of
+            Left s -> Left (Exception s)
+            Right es' ->
               case S.appAssign n es' dst state of
                 Just state' -> ct state'
                 Nothing -> Left Mismatch
-        (Poly table) -> 
-          let es' = map (eval state) es
-              lam = choosePoly table es' in 
-            match (App lam es') (S.incDepth state) dst ct
+        (Poly table) -> do
+            case evalMany state es of
+              Left s -> Left (Exception s)
+              Right es' -> let lam = choosePoly table es' in
+                match (App lam es') (S.incDepth state) dst ct
         a -> Left $ Exception $ "App expression not a var nor lam" ++ show a
   where
     matchApp :: [Expr]

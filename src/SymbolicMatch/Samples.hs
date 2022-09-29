@@ -385,7 +385,7 @@ zipWithF =
             Alt "Cons" [5, 6] (
               cons 
                 (App (Var 0) [Var 3, Var 5]) 
-                (App (Var $ -78) [Var 4, Var 6])
+                (App (Var $ -78) [Var 0, Var 4, Var 6])
             )
           ]
         )
