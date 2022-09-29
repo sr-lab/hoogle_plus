@@ -87,7 +87,7 @@ exercises = [
   ("indexConst", "[Int] -> Int", [Example {inputs = ["[1, 2, 3]"], output = "3"}]),
   ("allGreaterThan", "[Int] -> Bool", [Example {inputs = ["[2, 3, 4]"], output = "Data.Bool.True"}, 
                               Example {inputs = ["[2, 1, 4]"], output = "Data.Bool.False"}]),
-  ("dropConst", "[Int] -> [Int]", [Example {inputs = ["[1, 2, 3, 4, 5]"], output = "[3, 4, 5]"}]),
+  ("dropConst", "[Int] -> [Int]", [Example {inputs = ["[0, 4, 4, 3]"], output = "[4, 3]"}]),
   ("filterGreaterThan", "[Int] -> [Int]", [Example {inputs = ["[2, 0, 1, 3]"], output = "[2, 3]"}]),
   ("filterPairs", "[(Int, Int)] -> [(Int, Int)]", [Example {inputs = ["[(1, 2), (3, 3), (4, 5)]"], output = "[(3, 3)"}]),
   ("filterEq", "[Int] -> [Int]", [Example {inputs = ["[1, 2, 1, 3, 4, 4]"], output = "[1, 1]"}]),
