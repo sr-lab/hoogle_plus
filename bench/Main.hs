@@ -53,16 +53,23 @@ execExercise (name, ty, mexs) = do
   if length ls > 1
     then return $ (name, Just (read (ls !! 1) :: Double))
     else return (name, Nothing)
-  where
-    command :: String -> [Example] -> String -> String
-    command ty exs log = printf "timeout 60s stack exec -- hplus --json=\'{\"query\":\"%s\", \"inExamples\":%s}\' --cnt=%d --out=%s" ty (unpack $ encode exs) count log 
+  
+
+command :: String -> [Example] -> String -> String
+command ty exs log = printf "timeout 60s stack exec -- hplus --json=\'{\"query\":\"%s\", \"inExamples\":%s}\' --cnt=%d --out=%s" ty (unpack $ encode exs) count log 
 
 printStats :: Handle -> (String, Maybe Double) -> IO ()
 printStats h (name, Nothing) = hPutStrLn h $ name ++ ": no solution in time."
 printStats h (name, Just tm) = hPutStrLn h $ name ++ ": " ++ show tm ++ " seconds."
 
+printCommand (name, ty, mexs) = do
+  let log = logsDir ++ "/" ++ name ++ ".log" 
+  putStrLn $ command ty mexs log
+  hFlush stdout
+
 main :: IO ()
 main = do
+  -- mapM_ printCommand exercises
   readCreateProcessWithExitCode (shell "stack exec -- hplus generate --preset=partialfunctions") ""
   removePathForcibly logsDir
   createDirectory logsDir
