@@ -25,11 +25,14 @@ logsDir = "bench-logs-extension"
 resultsFile :: String
 resultsFile = "results.log"
 
-count :: Int
-count = 100
+count1 :: Int
+count1 = 10
 
-exercises :: [(String, String, [Example])]
-exercises = [
+count2 :: Int
+count2 = 100
+
+exercises1 :: [(String, String, [Example])]
+exercises1 = [
   ("firstRight", "[Either a b] -> Either a b", []),
   ("firstKey", "[(a, b)] -> a", []),
   ("flatten", "[[[a]]] -> [a]", []),
@@ -73,7 +76,9 @@ exercises = [
   ("firstMaybe", "[Maybe a] -> a", []),
   ("mbToEither", "Maybe a -> b -> Either a b", []),
   ("pred-match", "[a] -> (a -> Bool) -> Int", []),
-  ("singleList", "Int -> [Int]", []),
+  ("singleList", "Int -> [Int]", [])]
+
+exercises2 = [
   -- new exercises
   ("mapAdd", "[Int] -> [Int]", [Example {inputs = ["[1, 2, 3]"], output = "[2, 3, 4]"}]),
   ("mapSquare", "[Int] -> [Int]", [Example {inputs = ["[1, 2, 3]"], output = "[1, 4, 9]"}]),
@@ -95,17 +100,17 @@ exercises = [
   ("addElemsTwoLists", "[Int] -> [Int] -> [Int]", [Example {inputs = ["[1, 2, 3]", "[3, 4, 5]"], output = "[4, 6, 8]"}])
   ]
 
-execExercisesPar :: Int -> [(String, String, [Example])] -> IO ()
-execExercisesPar _ [] = return ()
-execExercisesPar cores exs = do
+execExercisesPar :: Int -> Int -> [(String, String, [Example])] -> IO ()
+execExercisesPar _ _ [] = return ()
+execExercisesPar cores count exs = do
   let execNow = take cores exs
   let execAfter = drop cores exs
-  hs <- mapM execExercise execNow
+  hs <- mapM (execExercise count) execNow
   mapM_ waitForProcess hs
-  execExercisesPar cores execAfter
+  execExercisesPar cores count execAfter
   
-execExercise :: (String, String, [Example]) -> IO ProcessHandle
-execExercise (name, ty, exs) = do
+execExercise :: Int -> (String, String, [Example]) -> IO ProcessHandle
+execExercise count (name, ty, exs) = do
   -- run exercise
   let log = logsDir ++ "/" ++ name ++ ".log"
   hPutStrLn stderr $ command ty exs log
@@ -150,8 +155,9 @@ main = do
   readCreateProcessWithExitCode (shell "stack exec -- hplus generate --preset=partialfunctions") ""
   --cores <- getNumProcessors
   let cores = 1
-  execExercisesPar cores exercises
-  stats <- mapM (\(n, _, _) -> do sts <- readLogStats n; return (n, sts)) exercises
+  execExercisesPar cores count1 exercises1 
+  execExercisesPar cores count2 exercises2 
+  stats <- mapM (\(n, _, _) -> do sts <- readLogStats n; return (n, sts)) (exercises1 ++ exercises2)
   mapM_ (printStats stdout) stats
   withFile (logsDir ++ "/" ++ resultsFile) WriteMode $ \handle ->
     mapM_ (printStats handle) stats
