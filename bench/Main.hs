@@ -12,7 +12,7 @@ resultsFile :: String
 resultsFile = "results.log"
 
 count :: Int
-count = 5
+count = 10
 
 exercises :: [(String, String)]
 exercises = [
