@@ -24,6 +24,8 @@ genOptsTier2 = genOptsTier1 {
 
 myModules = [
   -- base
+  "GHC.Num",
+  "Data.Ord",
   "Data.Int",
   "Data.Bool",
   "Data.Maybe",

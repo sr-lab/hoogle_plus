@@ -68,6 +68,10 @@ listToMaybe :: [a] -> Maybe a
 maybeToList :: Maybe a -> [a]
 catMaybes :: [Maybe a] -> [a]
 mapMaybe :: (a -> Maybe b) -> [a] -> [b]
+module GHC.Num
+(+) :: Num a => a -> a -> a
+(-) :: Num a => a -> a -> a
+(*) :: Num a => a -> a -> a
 module GHC.List
 map :: (a -> b) -> [a] -> [b]
 (++) :: [a] -> [a] -> [a]
@@ -175,7 +179,6 @@ infixr 3 &&
 (||) :: Bool -> Bool -> Bool
 infixr 2 ||
 not :: Bool -> Bool
-otherwise :: Bool
 bool :: a -> a -> Bool -> a
 module Data.Type.Bool
 type family If cond tru fls
@@ -934,34 +937,34 @@ instance GHC.Base.Monad Data.Proxy.Proxy
 instance GHC.Base.MonadPlus Data.Proxy.Proxy
 module Data.Ord
 class Eq a => Ord a
-compare :: Ord a => a -> a -> Ordering
+--compare :: Ord a => a -> a -> Ordering
 (<) :: Ord a => a -> a -> Bool
 (<=) :: Ord a => a -> a -> Bool
 (>) :: Ord a => a -> a -> Bool
 (>=) :: Ord a => a -> a -> Bool
 max :: Ord a => a -> a -> a
 min :: Ord a => a -> a -> a
-infix 4 <=
-infix 4 >=
-infix 4 <
-infix 4 >
-data Ordering
-LT :: Ordering
-EQ :: Ordering
-GT :: Ordering
-newtype Down a
-Down :: a -> Down a
-comparing :: Ord a => (b -> a) -> b -> b -> Ordering
-instance GHC.Base.Monoid a => GHC.Base.Monoid (Data.Ord.Down a)
-instance GHC.Base.Semigroup a => GHC.Base.Semigroup (Data.Ord.Down a)
-instance GHC.Num.Num a => GHC.Num.Num (Data.Ord.Down a)
-instance GHC.Read.Read a => GHC.Read.Read (Data.Ord.Down a)
-instance GHC.Show.Show a => GHC.Show.Show (Data.Ord.Down a)
-instance GHC.Classes.Eq a => GHC.Classes.Eq (Data.Ord.Down a)
-instance GHC.Classes.Ord a => GHC.Classes.Ord (Data.Ord.Down a)
-instance GHC.Base.Functor Data.Ord.Down
-instance GHC.Base.Applicative Data.Ord.Down
-instance GHC.Base.Monad Data.Ord.Down
+--infix 4 <=
+--infix 4 >=
+--infix 4 <
+--infix 4 >
+--data Ordering
+--LT :: Ordering
+--EQ :: Ordering
+--GT :: Ordering
+--newtype Down a
+--Down :: a -> Down a
+--comparing :: Ord a => (b -> a) -> b -> b -> Ordering
+--instance GHC.Base.Monoid a => GHC.Base.Monoid (Data.Ord.Down a)
+--instance GHC.Base.Semigroup a => GHC.Base.Semigroup (Data.Ord.Down a)
+--instance GHC.Num.Num a => GHC.Num.Num (Data.Ord.Down a)
+--instance GHC.Read.Read a => GHC.Read.Read (Data.Ord.Down a)
+--instance GHC.Show.Show a => GHC.Show.Show (Data.Ord.Down a)
+--instance GHC.Classes.Eq a => GHC.Classes.Eq (Data.Ord.Down a)
+--instance GHC.Classes.Ord a => GHC.Classes.Ord (Data.Ord.Down a)
+--instance GHC.Base.Functor Data.Ord.Down
+--instance GHC.Base.Applicative Data.Ord.Down
+--instance GHC.Base.Monad Data.Ord.Down
 module Data.Either
 data Either a b
 Left :: a -> Either a b
