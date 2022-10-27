@@ -30,7 +30,7 @@ count = 100
 
 exercises :: [(String, String, [Example])]
 exercises = [
-  {-("firstRight", "[Either a b] -> Either a b", []),
+  ("firstRight", "[Either a b] -> Either a b", []),
   ("firstKey", "[(a, b)] -> a", []),
   ("flatten", "[[[a]]] -> [a]", []),
   ("repl-funcs", "(a -> b) -> Int -> [a -> b]", []),
@@ -73,7 +73,7 @@ exercises = [
   ("firstMaybe", "[Maybe a] -> a", []),
   ("mbToEither", "Maybe a -> b -> Either a b", []),
   ("pred-match", "[a] -> (a -> Bool) -> Int", []),
-  ("singleList", "Int -> [Int]", []),-}
+  ("singleList", "Int -> [Int]", []),
   -- new exercises
   ("mapAdd", "[Int] -> [Int]", [Example {inputs = ["[1, 2, 3]"], output = "[2, 3, 4]"}]),
   ("mapSquare", "[Int] -> [Int]", [Example {inputs = ["[1, 2, 3]"], output = "[1, 4, 9]"}]),
@@ -149,7 +149,7 @@ main = do
   createDirectory logsDir
   readCreateProcessWithExitCode (shell "stack exec -- hplus generate --preset=partialfunctions") ""
   --cores <- getNumProcessors
-  let cores = 4
+  let cores = 1
   execExercisesPar cores exercises
   stats <- mapM (\(n, _, _) -> do sts <- readLogStats n; return (n, sts)) exercises
   mapM_ (printStats stdout) stats
