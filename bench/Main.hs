@@ -69,11 +69,12 @@ printCommand (name, ty, mexs) = do
 
 main :: IO ()
 main = do
-  -- mapM_ printCommand exercises
+  mapM_ printCommand exercises
+  {-
   readCreateProcessWithExitCode (shell "stack exec -- hplus generate --preset=partialfunctions") ""
   removePathForcibly logsDir
   createDirectory logsDir
   stats <- mapM execExercise exercises
   mapM_ (printStats stdout) stats
   withFile (logsDir ++ "/" ++ resultsFile) WriteMode $ \handle -> do
-    mapM_ (printStats handle) stats
+    mapM_ (printStats handle) stats -}
