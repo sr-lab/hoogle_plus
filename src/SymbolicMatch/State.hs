@@ -6,77 +6,54 @@ import qualified SymbolicMatch.Env as E
 import SymbolicMatch.Expr
 
 data State = State
-    {   constr :: C.ConstrSet
-    ,   depth :: Int
-    ,   env :: E.Env
-    ,   gen :: Int
-    ,   maxDepth :: Int
-    }
+    {   constr :: !C.ConstrSet
+    ,   depth :: !Int
+    ,   env :: !E.Env
+    ,   gen :: !Int
+    ,   maxDepth :: !Int
+    } deriving Show
 
--- FIXME varias n sao necessarias
--- FIXME [Constr] -> C.Set
 incDepth :: State -> State
-incDepth State {constr=c, depth=d, env=e, gen=g, maxDepth=m} =
-    State {constr=c, depth=d+1, env=e, gen=g, maxDepth=m}
-
-newConstr :: State -> C.ConstrSet -> State
-newConstr State {constr=c, depth=d, env=e, gen=g, maxDepth=m} c'=
-    State {constr=c', depth=d+1, env=e, gen=g, maxDepth=m}
+incDepth state@State {depth=d} = state{depth=d+1}
 
 newEnv :: State -> E.Env -> State
-newEnv State {constr=c, depth=d, env=e, gen=g, maxDepth=m} e'=
-    State {constr=c, depth=d+1, env=e', gen=g, maxDepth=m}
+newEnv state@State {depth=d} e'= state{depth=d+1, env=e'}
 
-newState :: State -> C.ConstrSet -> E.Env -> State
-newState State {constr=_, depth=d, env=_, gen=g', maxDepth=m} c' e'=
-    State {constr=c', depth=d+1, env=e', gen=g', maxDepth=m}
-
-
-init :: E.Env -> Int -> State -- gen must be grater than the original syms to avoid collision
+init :: E.Env -> Int -> State -- gen must be grater than the original syms in src to avoid collision
 init e' maxDepth = State {constr=C.init, depth=0, env=e', gen=1000, maxDepth=maxDepth}
 
-
 genSym :: State -> (Expr, State)
-genSym State {constr=c', depth=d, env=e', gen=g', maxDepth=m} =
-    (Sym g', State {constr=c', depth=d+1, env=e', gen=g'+1, maxDepth=m})
-
+genSym state@State {gen=g'} = (Sym g', state {gen=g'+1})
 
 genSyms :: Int -> State -> ([Expr], State)
-genSyms k State {constr=c', depth=d, env=e', gen=g', maxDepth=m} =
+genSyms k state@State {gen=g'} =
     let ids = take k (iterate (+1) g')
-        syms = map Sym ids in
-            (syms, State {constr=c', depth=d, env=e', gen=g'+k, maxDepth=m})
-
+        syms = map Sym ids in (syms, state {gen=g'+k})
 
 bind :: Int -> Expr -> State -> State
-bind k v State {constr=c, depth=d, env=e, gen=g, maxDepth=m} =
-    State {constr=c, depth=d, env=E.bind k v e, gen=g, maxDepth=m}
-
+bind k v state@State {env=e} = state {env=E.bind k v e}
 
 bindAll :: [(Int, Expr)] -> State -> State
-bindAll pairs State {constr=c, depth=d, env=e, gen=g, maxDepth=m} =
-    State {constr=c, depth=d, env=E.bindAll pairs e, gen=g, maxDepth=m}
-
+bindAll pairs state@State {env=e} = state {env=E.bindAll pairs e}
 
 get :: Int -> State -> Maybe Expr
 get k s = E.get k (env s)
 
-
 unsafeGet :: Int -> State -> String -> Expr
 unsafeGet k s = E.unsafeGet k (env s)
 
+assign :: Int -> Expr -> State -> State
+assign n exp state@State {constr=cs} = state{constr = C.assign n exp cs}
 
-assign :: Int -> Expr -> State -> Maybe State
-assign n exp state@State {constr=cs, depth=d, env=e, gen=g, maxDepth=m} =
-  case C.assign n exp cs of
-    Just cs' -> Just State {constr=cs', depth=d, env=e, gen=g, maxDepth=m}
-    Nothing -> Nothing
+lookupSym :: Int -> State -> Maybe Expr
+lookupSym n State{constr = cs} = C.lookup n cs
 
-appAssign :: Int -> [Expr] -> Expr -> State -> Maybe State
-appAssign n args exp state@State {constr=cs, depth=d, env=e, gen=g, maxDepth=m} =
-  case C.appAssign n args exp cs of
-    Just cs' -> Just State {constr=cs', depth=d, env=e, gen=g, maxDepth=m}
-    Nothing -> Nothing
+appAssign :: Int -> [Expr] -> Expr -> State -> State
+appAssign n args exp state@State {constr=cs} = 
+    state{constr = C.appAssign n args exp cs}
+
+lookupApp :: Int -> [Expr] -> State -> Maybe Expr
+lookupApp n args State{constr = cs} = C.lookupApp n args cs
 
 getAssign :: Int -> State -> Maybe Expr
 getAssign s state = C.getAssign s (constr state)

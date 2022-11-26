@@ -1,10 +1,13 @@
 {-# LANGUAGE LambdaCase #-}
-module SymbolicMatch.Eval (eval, choosePoly, evalMany) where
+module SymbolicMatch.Eval (eval, evalMany) where
 
 import qualified SymbolicMatch.State as S
 import SymbolicMatch.Expr
 
 -- evalutes everything possible without symbolic branches
+-- with the exception of App and Case, because it is used in 
+-- App case of match, and, due to shadowing, the variables are no
+-- corectly replaced, so leave this work to match
 eval :: S.State -> Expr -> Either String Expr
 
 eval st sym@(Sym n) = case S.getAssign n st of
@@ -23,18 +26,21 @@ eval st (DataC n args) = case evalMany st args of
   Left err -> Left err
   Right args -> Right $ DataC n args
 
-eval _ lit@(Lit _) = Right lit
-
 eval st (App e es) =
   case eval st e of
     Right (Lam ps exp) -> do
       es' <- evalMany st es
-      let st' = S.bindAll (zip ps es') st
-      eval st' exp
-    Right (Poly table) -> do
+      return $ App (Lam ps exp) es'
+    Right (Poly lambs) -> do
       es' <- evalMany st es
-      let lam = choosePoly table es'
-      eval st (App lam es')        
+      tryLams lambs es'      
+      where
+        tryLams :: [Expr] -> [Expr] -> Either String Expr
+        tryLams [] args = Left "eval: no lambda for poly"
+        tryLams (h:t) args = case eval st (App h args) of 
+            Left s -> tryLams t args
+            Right ex -> Right ex
+
     Right o -> do
       es' <- evalMany st es
       Right $ App o es'
@@ -44,7 +50,8 @@ eval st (Case e alts) =
   case eval st e of
     Right (DataC "Error" []) -> Right $ DataC "Error" []
     Right (DataC s exs) -> searchAlt s exs alts
-    Right o -> Right $ Case o alts
+    Right o -> Right $ Case o alts -- não se pode avaliar as alts con 
+    --shadowing do env. ex.: Lam [0, 1] (Case () -- Cons 2 3) => pode substituir 2 e 3 se já existir
     Left err -> Left err
   where 
     searchAlt :: String -> [Expr] -> [Alt] -> Either String Expr
@@ -59,24 +66,7 @@ eval _ w@WildCard = Right w
 
 evalMany :: S.State -> [Expr] -> Either String [Expr]
 evalMany st [] = Right []
-evalMany st (e:es) = case eval st e of
-  Left s -> Left s
-  Right ex -> case evalMany st es of
-    Left s -> Left s
-    Right exs -> Right (ex:exs)
-
--- given a poly table and the arguments, choose lambda
--- arguments must be evaluated!
-choosePoly :: PolyTable -> [Expr] -> Expr
-choosePoly [] es = error $ "No suitable alternatives for poly: " ++ show es
-choosePoly (PolyAlt rules lam:alts) args
-  | all ruleSat rules = lam
-  | otherwise =  choosePoly alts args
-  where
-    ruleSat :: Rule -> Bool
-    ruleSat (DataConsIn argInd datacs)
-      | argInd < length args = 
-        case args !! argInd of
-          DataC n _-> n `elem` datacs
-          _ -> False
-      | otherwise = error "Bad rule"
+evalMany st (e:es) = do
+  e' <- eval st e
+  es' <- evalMany st es 
+  return (e':es')

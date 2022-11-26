@@ -35,14 +35,19 @@ nothing = DataC "Data.Maybe.Nothing" []
 just :: Expr -> Expr
 just e = DataC "Data.Maybe.Just" [e]
 
+one, two, three :: Expr
+one = s z
+two = s one
+three = s two
+
 list1 :: Expr
-list1 = DataC "Cons" [Lit (LitInt 1), listNil]
+list1 = DataC "Cons" [one, listNil]
 
 list2 :: Expr
-list2 = DataC "Cons" [Lit (LitInt 2), list1]
+list2 = DataC "Cons" [two, list1]
 
 list3 :: Expr
-list3 = DataC "Cons" [Lit (LitInt 3), list2]
+list3 = DataC "Cons" [three, list2]
 
 
 getConsIndex :: Expr -> Int -> Maybe Expr
@@ -890,20 +895,7 @@ mulF =
 
 -- (==)
 eqF :: Expr
-eqF = Poly table
-  where
-    table :: PolyTable
-    table = [ PolyAlt [DataConsIn 0 ["Nil", "Cons"]] eqListF
-            , PolyAlt [DataConsIn 1 ["Nil", "Cons"]] eqListF
-            , PolyAlt [DataConsIn 0 [ "Data.Bool.True"
-                                    , "Data.Bool.False"]] eqBoolF
-            , PolyAlt [DataConsIn 1 [ "Data.Bool.True"
-                                    , "Data.Bool.False"]] eqBoolF
-            , PolyAlt [DataConsIn 0 ["Z", "S"]] eqNatF
-            , PolyAlt [DataConsIn 1 ["Z", "S"]] eqNatF
-            , PolyAlt [DataConsIn 0 ["Pair"]] eqPairF
-            , PolyAlt [DataConsIn 1 ["Pair"]] eqPairF
-            ]
+eqF = Poly [eqListF, eqBoolF, eqNatF, eqPairF]
     
 eqListF :: Expr
 eqListF = Lam [0, 1]
@@ -1336,4 +1328,3 @@ validate (DataC n es) =
 validate (App e es) = all validate (e:es)
 validate (Case e alts) = validate e && all (\(Alt _ _ es) -> validate es) alts
 validate WildCard = True
-validate (Lit _) = True

@@ -253,7 +253,7 @@ runExampleChecks params env goalType prog examples = do
         then do
             liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match (functions not supported by Match)."
             return []
-        else case Match.matchPairsPretty 150 pairs functionsEnv of
+        else case Match.matchPairsPretty 200 pairs functionsEnv of
             Left err -> 
                 case err of 
                     Match.Exception msg -> do 
