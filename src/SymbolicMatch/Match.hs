@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-{-# LANGUAGE BangPatterns #-}
 
 module SymbolicMatch.Match
     ( matchExprs, matchExprsPretty, matchPairsPretty, MatchError(..))
@@ -33,19 +32,19 @@ match (Lam n e) state dst ct = Left $ Exception "for now, do not match lambdas!"
 
 match (Poly n) state dst ct = Left $ Exception "for now, do not match poly!"
 
-match (Var !n) !state !dst !ct
+match (Var n) state dst ct
   | S.reachMaxDepth state = Left DepthReached
   | otherwise = case S.get n state of
       Nothing -> Left $ Exception $ "Match variable " ++ show n ++ " not found"
       Just e -> match e (S.incDepth state) dst ct
 
-match (Sym !n) !state !dst !ct
+match (Sym n) state dst ct
   | S.reachMaxDepth state = Left DepthReached  
   | otherwise = case S.lookupSym n state of
       Just e -> match e state dst ct
       Nothing -> ct (S.incDepth $ S.assign n dst state)
 
-match src@(DataC !n !es) !state !dst !ct
+match src@(DataC n es) state dst ct
   | S.reachMaxDepth state = Left DepthReached
   | otherwise = case dst of
       DataC n' es'
@@ -56,7 +55,7 @@ match src@(DataC !n !es) !state !dst !ct
         Just e -> match src state e ct
       _ -> Left Mismatch
 
-match (Case !e !alts) !state !dst !ct
+match (Case e alts) state dst ct
   | S.reachMaxDepth state = Left DepthReached
   | otherwise = matchScrutinee e (Alt "Error" [] (DataC "Error" []):alts) state dst False ct
   where
@@ -65,24 +64,24 @@ match (Case !e !alts) !state !dst !ct
     matchScrutinee :: Expr -> [Alt] -> S.State -> Expr -> Bool -> (S.State -> Either MatchError C.ConstrSet) -> Either MatchError C.ConstrSet
     matchScrutinee _ [] _ _ anyDepthReached _ = Left $ if anyDepthReached then DepthReached else Mismatch
     matchScrutinee scr ((Alt s ss e):alts) state dst anyDepthReached ct =
-      let !(syms, state') = S.genSyms (length ss) state
-          !ct' = \st -> match e (S.bindAll (zip ss syms) st) dst (\st' -> ct (S.newEnv st' (S.env st))) in
+      let (syms, state') = S.genSyms (length ss) state
+          ct' = \st -> match e (S.bindAll (zip ss syms) st) dst (\st' -> ct (S.newEnv st' (S.env st))) in
         case match scr state' (DataC s syms) ct' of
           Right cs' -> Right cs'
           Left DepthReached -> matchScrutinee scr alts (S.incDepth state) dst True ct
           Left _ -> matchScrutinee scr alts (S.incDepth state) dst anyDepthReached ct
 
-match (App !e !es) !state !dst !ct
+match (App e es) state dst ct
   | S.reachMaxDepth state = Left DepthReached
   | otherwise =
       case e of
-        (Lam !ps !e')
+        (Lam ps e')
           | length es == length ps -> case evalMany state es of
                 Left ex -> Left $ Exception ex
-                Right !es' -> let (!pairs, !args, !state') = appArgs es' state
-                                  !state'' = {-trace ("Args: " ++ show es ++ ", Args evaluated: " ++ show args ++ ", pairs: " ++ show pairs ++ ", Dst: " ++ show dst) $-} S.bindAll (zip ps args) state'
-                                  !ct' = \st -> matchPairs pairs (S.newEnv st (S.env state')) ct in
-                   {-trace(show state ++ show es ++ show es' ++ show pairs ++ show args) $-} match e' (S.incDepth state'') dst ct'
+                Right es' -> let (pairs, args, state') = appArgs es' state
+                                 state'' = S.bindAll (zip ps args) state'
+                                 ct' = \st -> matchPairs pairs (S.newEnv st (S.env state')) ct in
+                   match e' (S.incDepth state'') dst ct'
           | otherwise -> Left $ Exception $ "argument and param mismatch: " ++ show e ++ ";;;" ++ show es
         (Var n) -> let e' = S.unsafeGet n state ("App variable " ++ show n ++ " not found") in
             match (App e' es) (S.incDepth state) dst ct
