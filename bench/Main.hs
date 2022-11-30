@@ -13,18 +13,18 @@ resultsFile :: String
 resultsFile = "results.log"
 
 count :: Int
-count = 100
+count = 35
 
 exercises :: [(String, String, [Example])]
 exercises = [
   ("mapAdd", "[Int] -> [Int]", [Example {inputs = ["[1, 2, 3]"], output = "[2, 3, 4]"}]),
-  ("mapSquare", "[Int] -> [Int]", [Example {inputs = ["[1, 2, 3]"], output = "[1, 4, 9]"}]),
+  ("mapSquare", "[Int] -> [Int]", [Example {inputs = ["[1, 2]"], output = "[1, 4]"}]),
   ("appendConst", "[Int] -> [Int]", [Example {inputs = ["[1, 2, 3]"], output = "[1, 2, 3, 4]"}]),
   ("filterDiff", "[Int] -> [Int]", [Example {inputs = ["[1, 2, 3]"], output = "[1, 3]"}]),
   ("getFirstOnes", "[Int] -> [Int]", [Example {inputs = ["[1, 1, 0, 1, 2]"], output = "[1, 1]"}]),
   
   -- stackoverflow
-  ("removeFirstOnes", "[Int] -> [Int]", [Example {inputs = ["[1, 1, 0, 0, 1, 2]"], output = "[0, 1, 2]"}]),
+  ("removeFirstOnes", "[Int] -> [Int]", [Example {inputs = ["[1, 1, 0, 0, 1, 2]"], output = "[0, 0, 1, 2]"}]),
   ("listIntersect", "[Int] -> [Int] -> [Int]", [Example {inputs = ["[0, 2, 4]", "[2, 4, 6"], output = "[2, 4]"}]),
   ("indexConst", "[Int] -> Int", [Example {inputs = ["[1, 2, 0, 3, 0, 1]"], output = "3"}]),
   ("allGreaterThan", "[Int] -> Bool", [Example {inputs = ["[2, 3, 4]"], output = "Data.Bool.True"}, 
@@ -56,7 +56,7 @@ execExercise (name, ty, mexs) = do
   
 
 command :: String -> [Example] -> String -> String
-command ty exs log = printf "timeout 60s stack exec -- hplus --json=\'{\"query\":\"%s\", \"inExamples\":%s}\' --cnt=%d --out=%s" ty (unpack $ encode exs) count log 
+command ty exs log = printf "timeout 90s stack exec -- hplus --json=\'{\"query\":\"%s\", \"inExamples\":%s}\' --cnt=%d --out=%s" ty (unpack $ encode exs) count log 
 
 printStats :: Handle -> (String, Maybe Double) -> IO ()
 printStats h (name, Nothing) = hPutStrLn h $ name ++ ": no solution in time."
@@ -69,12 +69,12 @@ printCommand (name, ty, mexs) = do
 
 main :: IO ()
 main = do
-  mapM_ printCommand exercises
-  {-
+  --mapM_ printCommand exercises
+  
   readCreateProcessWithExitCode (shell "stack exec -- hplus generate --preset=partialfunctions") ""
   removePathForcibly logsDir
   createDirectory logsDir
   stats <- mapM execExercise exercises
   mapM_ (printStats stdout) stats
   withFile (logsDir ++ "/" ++ resultsFile) WriteMode $ \handle -> do
-    mapM_ (printStats handle) stats -}
+    mapM_ (printStats handle) stats 
