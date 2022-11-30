@@ -57,7 +57,7 @@ uncurry :: (a -> b -> c) -> (a, b) -> c
 swap :: (a, b) -> (b, a)
 module Data.Maybe
 data Maybe a
-Nothing :: Maybe a
+-- Nothing :: Maybe a
 Just :: a -> Maybe a
 maybe :: b -> (a -> b) -> Maybe a -> b
 isJust :: Maybe a -> Bool
@@ -131,14 +131,14 @@ coerce :: Coercible a b => a -> b
 class a ~R# b => Coercible (a :: k0) (b :: k0)
 module Data.Bool
 data Bool
-False :: Bool
-True :: Bool
+--False :: Bool
+--True :: Bool
 (&&) :: Bool -> Bool -> Bool
 infixr 3 &&
 (||) :: Bool -> Bool -> Bool
 infixr 2 ||
 not :: Bool -> Bool
-otherwise :: Bool
+--otherwise :: Bool
 bool :: a -> a -> Bool -> a
 module Data.Type.Bool
 type family If cond tru fls
