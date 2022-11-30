@@ -196,7 +196,7 @@ filesToLinearSynthSymbs fps modules = foldr (\fp r -> do r' <- r; c <- readFileT
                         then '(' : ((T.unpack curMod) ++ "." ++ (tail nm)) 
                         else (T.unpack curMod) ++ "." ++ nm 
                       in case S.lookupFun nmMod of -- FIXME (2 things):trace should be error? reject h.o.
-                        Nothing -> trace (printf "Function not in match: %s" (show nmMod)) $ parseLines t curMod modOk acc
+                        Nothing -> {-trace (printf "Function not in match: %s" (show nmMod)) $-} parseLines t curMod modOk acc
                         Just i -> parseLines t curMod modOk ((nmMod, parseTypeString ty , i):acc)
 
 getFiles :: PackageFetchOpts -> IO [FilePath]
