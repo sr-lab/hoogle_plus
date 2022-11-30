@@ -29,13 +29,14 @@ myModules = [
   "Data.Maybe",
   "Data.Either",
   "Data.Tuple",
-  "Text.Show",
   "GHC.Char",
+  "Text.Show",
   "GHC.List",
   "Data.Eq",
-  "Data.List",
+  "Data.Ord",
   "Data.Function",
   -- ByteString
   "Data.ByteString.Lazy",
-  "Data.ByteString.Builder"
-  ]
+  "Data.ByteString.Builder",
+  "GHC.Num"
+  ] -- module Symbol is included only for generating the database
