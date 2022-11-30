@@ -5,8 +5,8 @@ CNT=35
 echo "Setup..."
 rm -r $LOG_DIR
 mkdir $LOG_DIR
-stack build
-stack exec -- hplus generate --preset partialfunctions
+stack build 1> /dev/null 2> /dev/null
+stack exec -- hplus generate --preset partialfunctions 1> /dev/null 2> /dev/null
 
 echo "Benchmarking..."
 timeout $TIMEOUT stack exec -- hplus --json='{"query":"[Int] -> [Int]", "inExamples":[{"inputs":["[1, 2, 3]"],"output":"[2, 3, 4]"}]}' --cnt=$CNT --out=$LOG_DIR/mapAdd.log  1> /dev/null 2> /dev/null
