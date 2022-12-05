@@ -174,26 +174,26 @@ check_ goal searchParams solverChan checkerChan examples = do
         executeCheck prog = do
             case examples of
                 Nothing -> do
-                    ghcCheck <- runGhcChecks searchParams env destType prog
+                    ghcCheck <- runGhcChecks searchParams env destType prog checkerChan
                     return $ (maybeToList ghcCheck, 0.0)
                 Just [] -- when examples flags exists but is [], the symbols exist and won't be replaced
                         -- do not wast time on GHC
                     | hasSymbol prog -> do
-                        liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected (symbol not replaced)."
+                        liftIO $ writeChan checkerChan (MesgLog 1 "filterCheck" ("Test \'" ++ show prog ++ "\': rejected (symbol not replaced)."))
                         return ([], 0.0)
                     | otherwise -> do 
-                        ghcCheck <- runGhcChecks searchParams env destType prog
+                        ghcCheck <- runGhcChecks searchParams env destType prog checkerChan
                         return $ (maybeToList ghcCheck, 0.0)
                 Just examples' -> do
                     start <- liftIO getCPUTime
-                    progs <- runExampleChecks searchParams env destType prog examples'
+                    progs <- runExampleChecks searchParams env destType prog examples' checkerChan
                     end <- liftIO getCPUTime
                     let diff = fromIntegral (end - start) / (10^12)
                     let progs' = filter (not . hasSymbol) progs
                     case progs' of
                         []  -> return ([], diff)
                         _:_ -> do
-                            ghcChecks <- mapM (runGhcChecks searchParams env destType) progs'
+                            ghcChecks <- mapM (\p -> runGhcChecks searchParams env destType p checkerChan) progs'
                             return $ (catMaybes ghcChecks, diff)
             where
                 hasSymbol :: UProgram -> Bool
@@ -205,8 +205,8 @@ check_ goal searchParams solverChan checkerChan examples = do
                 
 -- validate type signiture, run demand analysis, and run filter test
 -- checks the end result type checks; all arguments are used; and that the program will not immediately fail
-runGhcChecks :: MonadIO m => SearchParams -> Environment -> RType -> UProgram -> FilterTest m (Maybe UProgram)
-runGhcChecks params env goalType prog  = let
+runGhcChecks :: MonadIO m => SearchParams -> Environment -> RType -> UProgram -> Chan Message -> FilterTest m (Maybe UProgram)
+runGhcChecks params env goalType prog checkerChan = let
      -- constructs program and its type signature as strings
     (modules, funcSig, body, argList) = extractSolution env goalType prog
     tyclassCount = length $ Prelude.filter (\(id, _) -> tyclassArgBase `isPrefixOf` id) argList
@@ -219,24 +219,24 @@ runGhcChecks params env goalType prog  = let
         filterCheckResult <- if disableFilter then return True else runChecks body funcSig modules
         case typeCheckResult of
             Left err -> do 
-                liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by GHC: type check."
+                liftIO $ writeChan checkerChan (MesgLog 1 "exampleCheck" ("Test \'" ++ show prog ++ "\': rejected by GHC: type check."))
                 liftIO $ hPutStrLn stderr (displayException err) 
                 return Nothing
             Right False -> do
-                liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by GHC: type check."
+                liftIO $ writeChan checkerChan (MesgLog 1 "exampleCheck" ("Test \'" ++ show prog ++ "\': rejected by GHC: type check."))
                 liftIO $ putStrLn "Program does not typecheck" 
                 return Nothing
             Right True
                 | strictCheckResult -> do 
                     if filterCheckResult
                         then do
-                            liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': accepted."
+                            liftIO $ writeChan checkerChan (MesgLog 1 "exampleCheck" ("Test \'" ++ show prog ++ "\': accepted."))
                             return $ Just prog
                         else do 
-                            liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by GHC: filter check."
+                            liftIO $ writeChan checkerChan (MesgLog 1 "exampleCheck" ("Test \'" ++ show prog ++ "\': rejected by GHC: filter check."))
                             return Nothing
                 | otherwise -> do
-                    liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by GHC: dependency analysis."
+                    liftIO $ writeChan checkerChan (MesgLog 1 "exampleCheck" ("Test \'" ++ show prog ++ "\': rejected by GHC: dependency analysis."))
                     return Nothing
 
 -- run the match algorithm against an example and return
@@ -247,23 +247,24 @@ runExampleChecks :: MonadIO m
                  -> RType 
                  -> UProgram 
                  -> [Example]
+                 -> Chan Message
                  -> FilterTest m [UProgram]
-runExampleChecks params env goalType prog examples = do
+runExampleChecks params env goalType prog examples checkerChan = do
     if (not . checkFunctionsPresent) prog 
         then do
-            liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match (functions not supported by Match)."
+            liftIO $ writeChan checkerChan (MesgLog 1 "exampleCheck" ("Test \'" ++ show prog ++ "\': rejected by match (functions not supported by Match)."))
             return []
         else case Match.matchPairsPretty 200 pairs functionsEnv of
             Left err -> 
                 case err of 
                     Match.Exception msg -> do 
-                        liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match (exception on match: " ++ msg ++ ")."
+                        liftIO $ writeChan checkerChan (MesgLog 1 "exampleCheck" ("Test \'" ++ show prog ++ "\': rejected by match (exception on match: " ++ msg ++ ")."))
                         return []
                     Match.Mismatch -> do
-                        liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match (mismatch)."
+                        liftIO $ writeChan checkerChan (MesgLog 1 "exampleCheck" ("Test \'" ++ show prog ++ "\': rejected by match (mismatch)."))
                         return []
                     Match.DepthReached -> do
-                        liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match (max depth reached)."
+                        liftIO $ writeChan checkerChan (MesgLog 1 "exampleCheck" ("Test \'" ++ show prog ++ "\': rejected by match (max depth reached)."))
                         return []
             Right cs -> do
                 -- replace all non-function symbols built by match
@@ -277,15 +278,15 @@ runExampleChecks params env goalType prog examples = do
                 
                 case mbsts of
                     -- error getting symbols types, probably compilation error
-                    Nothing -> do 
-                        liftIO $ putStrLn ("Test \'" ++ show prog ++ "\': rejected by match (compilation)")
+                    Nothing -> do
+                        liftIO $ writeChan checkerChan (MesgLog 1 "exampleCheck" ("Test \'" ++ show prog ++ "\': rejected by match (compilation)"))
                         return []
                     Just [] -> do
                         prog''' <- replaceWilcards prog''
                         case prog''' of
                             Just prog'''' -> return [prog'''']
                             Nothing -> do
-                                liftIO $ putStrLn ("Test \'" ++ show prog ++ "\': rejected by match (compilation)")
+                                liftIO $ writeChan checkerChan (MesgLog 1 "exampleCheck" ("Test \'" ++ show prog ++ "\': rejected by match (compilation)"))
                                 return []
                     Just sts -> do
                         -- if any symbol is not a function, it should be replace by match, before...
@@ -294,7 +295,7 @@ runExampleChecks params env goalType prog examples = do
                         -- synthesize lambdas for the function symbols and replace
                         case synthLambdas (_symsToLinearSynth env) sts argList cs of
                             [] -> do
-                                liftIO $ putStrLn $ "Test \'" ++ show prog ++ "\': rejected by match (synthesizing lambdas)."
+                                liftIO $ writeChan checkerChan (MesgLog 1 "exampleCheck" ("Test \'" ++ show prog ++ "\': rejected by match (synthesizing lambdas)."))
                                 return []
                             lams@(_:_) -> do
                                 let progsWithLams = [replaceLamsInProg l prog'' | l <- lams]

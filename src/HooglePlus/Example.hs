@@ -63,7 +63,7 @@ data Example = Example {
 -- | convert examples from a String to SymbolicMatch AST
 parseExamples :: String -> Either String [Example]
 parseExamples str = case parse expr "" str of
-  Right examples -> trace (showExpr [] examples) $ case examples of
+  Right examples -> case examples of
     DataC "Nil" [] -> Right []
     DataC "Cons" _ -> astExsToExamples (consToList examples)
     _ -> Left "Examples should be a list of pairs"
