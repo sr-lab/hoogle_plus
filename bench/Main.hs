@@ -78,9 +78,9 @@ execExercise (name, ty) = do
   if length ls > 1
     then return $ (name, Just (read (ls !! 1) :: Double))
     else return (name, Nothing)
-  where
-    command :: String -> String -> String
-    command ty log = printf "timeout 60s stack exec -- hplus \"%s\" --cnt=%d --out=%s" ty count log 
+
+command :: String -> String -> String
+command ty log = printf "timeout -k 1s $TIMEOUT stack exec -- hplus \"%s\" --cnt=$CNT --out=%s 1> /dev/null 2> /dev/null" ty log 
 
 printStats :: Handle -> (String, Maybe Double) -> IO ()
 printStats h (name, Nothing) = hPutStrLn h $ name ++ ": no solution in time."
@@ -88,10 +88,11 @@ printStats h (name, Just tm) = hPutStrLn h $ name ++ ": " ++ show tm ++ " second
 
 main :: IO ()
 main = do
-  readCreateProcessWithExitCode (shell "stack exec -- hplus generate --preset=partialfunctions") ""
+  mapM_ (\(i, (n, t)) -> putStrLn (command t ("$LOG_DIR/" ++ n ++ ".log")) >> putStrLn ("echo " ++ show i ++ "/44")) (zip (iterate (+1) 1) exercises)
+  {-readCreateProcessWithExitCode (shell "stack exec -- hplus generate --preset=partialfunctions") ""
   removePathForcibly logsDir
   createDirectory logsDir
   stats <- mapM execExercise exercises
   mapM_ (printStats stdout) stats
   withFile (logsDir ++ "/" ++ resultsFile) WriteMode $ \handle -> do
-    mapM_ (printStats handle) stats
+    mapM_ (printStats handle) stats-}
