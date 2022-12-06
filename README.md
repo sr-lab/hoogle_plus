@@ -63,4 +63,31 @@ You may try searches with different variants with the following command line arg
 
 - TYGARQB: Bounded abstraction refinement. Use `stack exec -- hplus --stop-refine=True --stop-threshold=10 "<query>"`. Replace `10` with any number. This is the maximum refinements HooglePlus will make.
 
+
+## Evaluation
+In the evaluation presented in the paper, we compare the extension to two versions of Hoogle+:
+- The 44 benchmarks that do not require input-output examples use the original version of Hoogle+
+- The 15 benchamrks that require input-output examples use a version of Hoogle+ that support examples
+
+Execute the following steps:
+1. Run the 59 benchmarks on the extension
+   ```
+   git checkout match
+   sh eval_ext.sh
+   ```
+2. Run the 44 benchmarks on the original hoogle plus
+   ```
+   git checkout hplus-original-bench
+   sh eval_orig.sh
+   ```
+3. Run the 15 benchmarks on the version of hoogle plus that supports examples
+   ```
+   git checkout hplus-examples-bench
+   stack install hoogle && hoogle generate
+   sh eval_examp.sh
+   ```
+
+TODO: uniformizar hoogle plus, +, H, ...; fazer eval_orig.sh; remover este readme
+
+
 [vscode-remote]: <https://code.visualstudio.com/docs/remote/containers>
