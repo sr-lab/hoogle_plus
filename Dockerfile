@@ -1,7 +1,5 @@
 # Pull base image.
 FROM ubuntu:18.04
-ARG port=3000
-EXPOSE ${port}
 
 # install locales
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y locales
@@ -34,12 +32,6 @@ RUN cd /home/hoogle_plus && stack build
 
 # Start with bash
 RUN cd /home/hoogle_plus && stack exec -- hplus generate --preset=partialfunctions
-RUN mkdir -p /var/log/hplus
-
-
-CMD cd /home/hoogle_plus && stack run webapp -p ${port} >> /var/log/hplus/run.log
-
-HEALTHCHECK CMD curl --fail http://localhost:${port}/ || exit 1
 
 # To start the image, please mount the source file directory to /home/hoogle_plus
 # docker run -v PATH_TO_HOOGLE_PLUS_SOURCE:/home/hoogle_plus -it hoogle_plus
