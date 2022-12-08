@@ -1,4 +1,5 @@
-# generate the second table
+import time
+
 exercises = [
     ("mapAdd", "[Int] -> [Int]", "[([[1, 2, 3]], [2, 3, 4])]"),
     ("mapSquare", "[Int] -> [Int]", "[([[1, 2, 3]], [1, 4, 9])]"),
@@ -17,34 +18,41 @@ exercises = [
     ("addElemsTwoLists", "[Int] -> [Int] -> [Int]", "[([[1, 2, 3], [3, 4, 5]], [4, 6, 8])]")
 ]
 
-dir1 = "bench-logs-examples"
-dir2 = "bench-logs-extension"
+dir = "bench-logs-extension"
 
-ind = 1
+print("\\documentclass{article}")
+print("\\begin{document}")
+print("\\begin{table}")
+print("\\centering")
+print("\\caption{Results (collected ", time.asctime() ,").}", sep='')
+print("\\begin{tabular}{rl||rrr}")
+print("\\hline ")
+print("\\# & Benchmark & Time (s) & Unify(s) & Sols\\\\")
+print("\\hline ")
+
+ind = 0
 for (n, t, e) in exercises:
-    logfile1 = open(dir1 + "/" + n + ".log")
-    logfile2 = open(dir2 + "/" + n + ".log")
-    lines1 = logfile1.readlines()
-    lines2 = logfile2.readlines()
+    ind +=1
+    try:
+        logfile = open(dir + "/" + n + ".log")
+    except:
+        continue
+
+    lines = logfile.readlines()
     
-    if len(lines1) > 1:
-        time1 = round(float(lines1[1][:-1]), 2)
-    else:
-        time1 = "-"
-
-    sols1 = len(lines1) // 2
-
-
-    if len(lines2) > 1:
-        timeTot2 = round(float(lines2[1].split()[1]), 2)
-        timeMat2 = round(float(lines2[1].split()[0]), 2)
+    if len(lines) > 1:
+        timeTot2 = round(float(lines[1].split()[1]), 2)
+        timeMat2 = round(float(lines[1].split()[0]), 2)
     else:
         timeTot2 = timeMat2 = "-"
     
-    sols2 = len(lines2) // 2
+    sols2 = len(lines) // 2
 
-    print(ind, "&", n, "&", time1, "&", sols1, "&", timeTot2, "&", timeMat2, "&", sols2, "\\\\")
-    ind +=1
+    print(ind, "&", n, "&", timeTot2, "&", timeMat2, "&", sols2, "\\\\")
+    
+    logfile.close()
 
-    logfile1.close()
-    logfile2.close()
+print("\\hline ")
+print("\\end{tabular}")
+print("\\end{table}")
+print("\\end{document}")
