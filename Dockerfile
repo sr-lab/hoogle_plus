@@ -22,8 +22,11 @@ ADD z3/bin/z3 /usr/bin
 #RUN apt-get install -y git build-essential
 
 # install haskell stack tool
-RUN apt-get install -y libtinfo-dev zlib1g-dev curl
-RUN curl -sSL https://get.haskellstack.org/ | sh
+#RUN apt-get install -y libtinfo-dev zlib1g-dev curl
+#RUN curl -sSL https://get.haskellstack.org/ | sh
+RUN apt-get install -y libtinfo-dev zlib1g-dev haskell-stack
+RUN stack upgrade
+#RUN apt-get remove -y curl
 RUN stack upgrade
 ENV PATH="/root/.local/bin:${PATH}"
 
@@ -36,10 +39,8 @@ ADD test /home/hoogle_plus/test
 ADD app /home/hoogle_plus/app
 ADD blacklist.txt /home/hoogle_plus
 ADD build /home/hoogle_plus/build
-ADD client_session_key.aes /home/hoogle_plus
-ADD dependencies /home/hoogle_plus/dependencies
 ADD data /home/hoogle_plus/data
-ADD eval_ext.sh results.py /home/hoogle_plus
+ADD eval_ext.sh results.py /home/hoogle_plus/
 ADD src /home/hoogle_plus/src
 ADD ho.txt /home/hoogle_plus
 ADD InternalTypeGen.hs /home/hoogle_plus
@@ -47,10 +48,10 @@ ADD libraries/ /home/hoogle_plus/libraries
 ADD stack.yaml package.yaml README.md /home/hoogle_plus/
 
 # Build Hoogle Plus
-RUN cd /home/hoogle_plus && stack build
+#RUN cd /home/hoogle_plus && stack build
 
 # Start with bash
-RUN cd /home/hoogle_plus && stack exec -- hplus generate --preset=partialfunctions
+#RUN cd /home/hoogle_plus && stack exec -- hplus generate --preset=partialfunctions
 
 # To start the image, please mount the source file directory to /home/hoogle_plus
 # docker run -v PATH_TO_HOOGLE_PLUS_SOURCE:/home/hoogle_plus -it hoogle_plus
