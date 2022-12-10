@@ -1,4 +1,4 @@
-LOG_DIR=bench-logs-extension
+LOG_DIR=logs
 TIMEOUT1=60s
 TIMEOUT2=90s
 CNT1=10
@@ -13,8 +13,8 @@ then
 fi
 
 echo "Setup..."
-rm -r $LOG_DIR 1> /dev/null 2> /dev/null
-mkdir $LOG_DIR 1> /dev/null 2> /dev/null
+rm -r $LOG_DIR 
+mkdir $LOG_DIR 
 stack build 1> /dev/null 2> /dev/null
 stack exec -- hplus generate --preset partialfunctions 1> /dev/null 2> /dev/null
 
