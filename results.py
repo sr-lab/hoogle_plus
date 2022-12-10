@@ -38,11 +38,17 @@ for n in exercises:
 
     lines = logfile.readlines()
     
+    timeTot2 = timeMat2 = "-"
+
     if len(lines) > 1:
-        timeTot2 = round(float(lines[1].split()[1]), 2)
-        timeMat2 = round(float(lines[1].split()[0]), 2)
-    else:
-        timeTot2 = timeMat2 = "-"
+        times = lines[1].split()
+        if len(times) == 2:
+            timeTot2 = round(float(lines[1].split()[1]), 2)
+            timeMat2 = round(float(lines[1].split()[0]), 2)
+        elif len(times) == 1:
+            timeTot2 = round(float(lines[1].split()[0]), 2)
+        else:
+            raise ValueError('Expected one or two real numbers')
     
     sols2 = len(lines) // 2
 
