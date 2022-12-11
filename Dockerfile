@@ -12,21 +12,12 @@ ENV LANGUAGE en_US:en
 ENV LC_ALL en_US.UTF-8
 
 # install z3
-#RUN apt-get install -y git build-essential python
-#RUN cd /home; git clone https://github.com/Z3Prover/z3.git
-#RUN cd /home/z3; git checkout z3-4.8.1; python scripts/mk_make.py; cd build; make; make install
 ADD z3/include /usr/include
 ADD z3/bin/libz3.so /usr/lib
 ADD z3/bin/z3 /usr/bin
 
-#RUN apt-get install -y git build-essential
-
 # install haskell stack tool
-#RUN apt-get install -y libtinfo-dev zlib1g-dev curl
-#RUN curl -sSL https://get.haskellstack.org/ | sh
 RUN apt-get install -y libtinfo-dev zlib1g-dev haskell-stack
-RUN stack upgrade
-#RUN apt-get remove -y curl
 RUN stack upgrade
 ENV PATH="/root/.local/bin:${PATH}"
 
@@ -34,24 +25,24 @@ ENV PATH="/root/.local/bin:${PATH}"
 RUN apt-get install -y python3
 
 # Get HooglePlus
-RUN cd /home && mkdir hoogle_plus
-ADD test /home/hoogle_plus/test 
-ADD app /home/hoogle_plus/app
-ADD blacklist.txt /home/hoogle_plus
-ADD build /home/hoogle_plus/build
-ADD data /home/hoogle_plus/data
-ADD eval_ext.sh results.py /home/hoogle_plus/
-ADD src /home/hoogle_plus/src
-ADD ho.txt /home/hoogle_plus
-ADD InternalTypeGen.hs /home/hoogle_plus
-ADD libraries/ /home/hoogle_plus/libraries
-ADD stack.yaml package.yaml README.md /home/hoogle_plus/
+ADD hoogle_plus_ext /home/hoogle_plus_ext/
+ADD hoogle_plus_orig /home/hoogle_plus_orig
+ADD hoogle_plus_examp /home/hoogle_plus_examp
+ADD eval.sh results.py /home/
 
 # Build Hoogle Plus
-#RUN cd /home/hoogle_plus && stack build
+RUN cd /home/hoogle_plus_ext && stack build
+RUN cd /home/hoogle_plus_orig && stack build 
+WORKDIR /home/hoogle_plus_examp 
+RUN stack build 
+RUN stack install hoogle 
+RUN hoogle generate
+WORKDIR /home/
 
-# Start with bash
-#RUN cd /home/hoogle_plus && stack exec -- hplus generate --preset=partialfunctions
+# Generate database
+RUN cd /home/hoogle_plus_ext && stack exec -- hplus generate --preset=partialfunctions
+RUN cd /home/hoogle_plus_orig && stack exec -- hplus generate --preset=partialfunctions
+RUN cd /home/hoogle_plus_examp && stack exec -- hplus generate --preset=partialfunctions
 
 # To start the image, please mount the source file directory to /home/hoogle_plus
 # docker run -v PATH_TO_HOOGLE_PLUS_SOURCE:/home/hoogle_plus -it hoogle_plus
