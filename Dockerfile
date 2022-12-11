@@ -17,7 +17,7 @@ ADD z3/bin/libz3.so /usr/lib
 ADD z3/bin/z3 /usr/bin
 
 # install haskell stack tool
-RUN apt-get install -y libtinfo-dev zlib1g-dev haskell-stack
+RUN apt-get install -y libtinfo-dev zlib1g-dev haskell-stack build-essential
 RUN stack upgrade
 ENV PATH="/root/.local/bin:${PATH}"
 
@@ -33,11 +33,7 @@ ADD eval.sh results.py /home/
 # Build Hoogle Plus
 RUN cd /home/hoogle_plus_ext && stack build
 RUN cd /home/hoogle_plus_orig && stack build 
-WORKDIR /home/hoogle_plus_examp 
-RUN stack build 
-RUN stack install hoogle 
-RUN hoogle generate
-WORKDIR /home/
+RUN cd /home/hoogle_plus_examp && stack build && stack install hoogle && hoogle generate
 
 # Generate database
 RUN cd /home/hoogle_plus_ext && stack exec -- hplus generate --preset=partialfunctions
