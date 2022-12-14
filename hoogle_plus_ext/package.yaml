@@ -91,5 +91,3 @@ executables:
     - -O2
     dependencies:
     - HooglePlus
-    - hspec-discover
-    build-tools: hspec-discover
