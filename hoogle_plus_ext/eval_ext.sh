@@ -13,10 +13,18 @@ then
 fi
 
 echo "Setup..."
-rm -r $LOG_DIR 
+
+rm -rf $LOG_DIR 
+if (test $? -ne 0); then echo "Error removing directory"; exit 1; fi
+
 mkdir $LOG_DIR 
+if (test $? -ne 0); then echo "Error creating directory"; exit 1; fi
+
 stack build 1> /dev/null 2> /dev/null
+if (test $? -ne 0); then echo "Error building hoolge_plus"; exit 1; fi
+
 stack exec -- hplus generate --preset partialfunctions 1> /dev/null 2> /dev/null
+if (test $? -ne 0); then echo "Error generating database"; exit 1; fi
 
 echo "Benchmarking..."
 

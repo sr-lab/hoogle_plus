@@ -48,14 +48,14 @@ for n in exercises:
     if len(linesO) > 1:
         timesO = linesO[1].split()
         if len(timesO) == 1:
-            timeO = round(float(linesO[1].split()[0]), 2)
+            timeO = round(float(timesO[0]), 2)
         else:
             raise ValueError('Expected one real number')
 
     if len(linesE) > 1:
         timesE = linesE[1].split()
         if len(timesE) == 2:
-            timeE = round(float(linesE[1].split()[1]), 2)
+            timeE = round(float(timesE[1]), 2)
         else:
             raise ValueError('Expected two real numbers')
     
@@ -94,15 +94,15 @@ for n in exercises:
     if len(linesO) > 1:
         timesO = linesO[1].split()
         if len(timesO) == 1:
-            timeO = round(float(linesO[1].split()[1]), 2)
+            timeO = round(float(timesO[0]), 2)
         else:
             raise ValueError('Expected two real numbers')
 
     if len(linesE) > 1:
         timesE = linesE[1].split()
         if len(timesE) == 2:
-            timeE = round(float(linesE[1].split()[1]), 2)
-            matchE = round(float(linesE[1].split()[0]), 2)
+            timeE = round(float(timesE[1]), 2)
+            matchE = round(float(timesE[0]), 2)
         else:
             raise ValueError('Expected two real numbers')
     
