@@ -30,7 +30,10 @@ eval st (App e es) =
   case eval st e of
     Right (Lam ps exp) -> do
       es' <- evalMany st es
-      return $ App (Lam ps exp) es'
+      --return $ App (Lam ps exp) es'
+      let st' = S.bindAll (zip ps es') st
+      --return $ 
+      eval st' exp
     Right (Poly lambs) -> do
       es' <- evalMany st es
       tryLams lambs es'      

@@ -41,18 +41,18 @@ data ArgumentType =
   | ArgTypeTuple [ArgumentType]
   | ArgTypeApp  ArgumentType ArgumentType
   | ArgTypeFunc ArgumentType ArgumentType
-  deriving (Eq, Generic)
+  deriving (Eq, Generic, Show)
 
 instance Serialize ArgumentType
 
-instance Show ArgumentType where
+{-instance Show ArgumentType where
   show (Concrete    name) = name
   show (Polymorphic name) = name
   show (ArgTypeList sub)  = printf "[%s]" (show sub)
   show (ArgTypeApp  l r)  = printf "((%s) (%s))"  (show l) (show r)
   show (ArgTypeTuple types) =
     (printf "(%s)" . intercalate ", " . map show) types
-  show (ArgTypeFunc src dst) = printf "((%s) -> (%s))" (show src) (show dst)
+  show (ArgTypeFunc src dst) = printf "((%s) -> (%s))" (show src) (show dst)-}
 
 newtype NotSupportedException = NotSupportedException String
   deriving (Show, Typeable)
@@ -60,27 +60,27 @@ newtype NotSupportedException = NotSupportedException String
 instance Exception NotSupportedException
 
 data TypeConstraint = TypeConstraint String String
-  deriving (Generic)
+  deriving (Generic, Show)
 
 instance Serialize TypeConstraint
 
-instance Show TypeConstraint where
-  show (TypeConstraint name constraint) = printf "%s %s" constraint name
+--instance Show TypeConstraint where
+  --show (TypeConstraint name constraint) = printf "%s %s" constraint name
 
 data FunctionSignature =
   FunctionSignature { _constraints :: [TypeConstraint]
                     , _argsType :: [ArgumentType]
                     , _returnType :: ArgumentType
-  } deriving (Generic)
+  } deriving (Generic, Show)
 
 instance Serialize FunctionSignature
 
-instance Show FunctionSignature where
+{-instance Show FunctionSignature where
   show (FunctionSignature constraints argsType returnType) =
     printf "(%s) => %s" constraintsExpr argsExpr
       where
         constraintsExpr = (intercalate ", " . map show) constraints
-        argsExpr = (intercalate " -> " . map show) (argsType ++ [returnType])
+        argsExpr = (intercalate " -> " . map show) (argsType ++ [returnType]) -}
 
 data FilterState = FilterState {
   inputs :: [[String]],
