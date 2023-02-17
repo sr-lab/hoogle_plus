@@ -51,6 +51,8 @@ import Control.Concurrent.Chan
 import Control.Monad.Trans.State
 import Control.Concurrent
 import System.CPUTime (getCPUTime)
+import Text.Read(readMaybe)
+
 
 -- FIXME remove some?
 import SymbolicMatch.Samples
@@ -305,7 +307,9 @@ runExampleChecks params env goalType prog examples checkerChan = do
         (modules, funcSig, _, argList) = extractSolution env goalType prog
 
         progWithGoodSymNames :: UProgram
-        progWithGoodSymNames = changeSymbolsNames $ removeTc prog
+        progWithGoodSymNames = case removeTcargs (changeSymbolsNames $ removeTc prog) of
+            Just prog -> prog
+            Nothing -> error "prog is simply a tcarg"
 
         -- SymbolicMatch does not support all functions, and raises an error
         -- we prefer to avoid error and skip to the next
@@ -392,7 +396,7 @@ runExampleChecks params env goalType prog examples checkerChan = do
         -- nothing means that the msg does not have a hole with that prefix
         extractType :: T.Text -> T.Text -> Maybe (Int, String)
         extractType prefix msg = let
-            -- holeLine: Found h>ole: _Sym0 :: Int -> Int -> Int
+            -- holeLine: Found hole: _Sym0 :: Int -> Int -> Int
             holeLine = (T.lines msg) !! 1 
             -- hole: _Sym0 :: Int -> Int -> Int
             hole = snd $ T.break (== '_') holeLine
@@ -401,7 +405,9 @@ runExampleChecks params env goalType prog examples checkerChan = do
             -- symbolType: Int -> Int -> Int
             symbolType = T.unwords $ drop 2 $ T.words hole in
                 case T.stripPrefix (T.cons '_' prefix) symbolName of
-                    Just t -> Just (read (T.unpack $ t), T.unpack symbolType)
+                    Just t -> case readMaybe (T.unpack t) :: Maybe Int of
+                        Just int -> Just (int, T.unpack symbolType)
+                        Nothing -> error "extractType: error reading type"
                     Nothing -> Nothing
 
         synthLambdas :: [(String, FunctionSignature, Int)]

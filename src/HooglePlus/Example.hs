@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 module HooglePlus.Example ( Example(..)
                           , parseExamples
                           , programToExpr
@@ -7,7 +9,8 @@ module HooglePlus.Example ( Example(..)
                           , isSymbol
                           , lookupSymType
                           , removeModulePrefix
-                          , symbolsInfo) where
+                          , symbolsInfo
+                          , removeTcargs) where
 
 import SymbolicMatch.Match
 import SymbolicMatch.Expr
@@ -20,7 +23,8 @@ import Text.Parsec hiding (runParser)
 import Text.Parsec.String (Parser)
 import Text.Parsec.Token
 import Text.Parsec.Language (emptyDef)
-
+import Text.Read(readMaybe)
+import Data.Maybe(mapMaybe)
 import Text.Printf (printf)
 
 import Debug.Trace (trace)
@@ -161,13 +165,17 @@ programToExpr :: UProgram -- solution in Synquid AST
               -> Example  -- example
               -> [String] -- argument list
               -> Expr     -- and the expression to SymbolicMatch
-programToExpr prog example argsNames =
-  programToExpr' prog example
+programToExpr prog example argsNames = case removeTcargs prog of
+  Just prog' -> programToExpr' prog' example
+  Nothing -> error "the program was only a tcarg"
+
   where 
     -- returns the index of the argument: "arg2" -> 1
     lookupArg :: String -> Maybe Int
     lookupArg id
-      | id `elem` argsNames = Just $ (read (drop (length "arg") id) :: Int) - 1 -- args start in 1
+      | id `elem` argsNames = case readMaybe (drop (length "arg") id) :: Maybe Int of
+          Just int -> Just $ int - 1
+          Nothing -> Nothing
       | otherwise = Nothing
 
     -- FIXME now args cannot be functions, because one cant write a function as example
@@ -188,3 +196,13 @@ programToExpr prog example argsNames =
               DataC id args'
           | otherwise -> error $ "\'" ++ id ++ "\'" ++ " is not a function nor argument nor data constructor"
       _ -> error "Not supposed to be a solution."
+
+-- remove ocurrences of tcargs, the typecalss arguments 
+-- returns Nothing when the program is simply a simbol tcarg
+removeTcargs :: UProgram -> Maybe UProgram
+removeTcargs prog = case content prog of 
+  PSymbol id
+    | "tcarg" `isPrefixOf` id -> Nothing
+    | otherwise -> Just prog
+  PApp id args -> Just prog{content = PApp id $ mapMaybe removeTcargs args}
+  _ -> error "Not supposed to be a solution."
