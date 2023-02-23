@@ -1,12 +1,19 @@
-LOG_DIR=bench-logs-examples
+LOG_DIR=logs
 TIMEOUT=90s
 CNT=35
 
 echo "Setup..."
-rm -r $LOG_DIR
-mkdir $LOG_DIR
+rm -rf $LOG_DIR 
+if (test $? -ne 0); then echo "Error removing directory"; exit 1; fi
+
+mkdir $LOG_DIR 
+if (test $? -ne 0); then echo "Error creating directory"; exit 1; fi
+
 stack build 1> /dev/null 2> /dev/null
+if (test $? -ne 0); then echo "Error building hoolge_plus"; exit 1; fi
+
 stack exec -- hplus generate --preset partialfunctions 1> /dev/null 2> /dev/null
+if (test $? -ne 0); then echo "Error generating database"; exit 1; fi
 
 echo "Benchmarking..."
 
@@ -40,3 +47,4 @@ timeout -k 1s $TIMEOUT stack exec -- hplus --json='{"query":"[Int]", "inExamples
 echo 14/15
 timeout -k 1s $TIMEOUT stack exec -- hplus --json='{"query":"[Int] -> [Int] -> [Int]", "inExamples":[{"inputs":["[1, 2, 3]","[3, 4, 5]"],"output":"[4, 6, 8]"}]}' --cnt=$CNT --out=$LOG_DIR/addElemsTwoLists.log 1> /dev/null 2> /dev/null
 echo 15/15
+echo "Done"

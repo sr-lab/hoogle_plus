@@ -70,14 +70,6 @@ import Data.List.Split
 
 import System.CPUTime (getCPUTime)
 
--- remove
-import HooglePlus.LinearSynth
-import HooglePlus.FilterTest as FT
-import Types.Filtering
-import SymbolicMatch.Expr as E
-import SymbolicMatch.Match
-import SymbolicMatch.Samples
-
 programName = "hoogleplus"
 versionName = "0.1"
 releaseDate = fromGregorian 2019 3 10
@@ -272,16 +264,6 @@ executeSearch :: SynquidParams -> SearchParams  -> String -> Maybe [Example] -> 
 executeSearch synquidParams searchParams query examples handle = do
   startTime <- getCPUTime
   env <- readEnv
-  --let pairs = [(E.App (E.Var (-9)) [E.Lam [1] (E.App (E.Var (-81)) [E.App (E.Var (-37)) [E.Var 1],E.App (E.Var (-25)) [E.Sym 217281]]),E.DataC "Cons" [E.DataC "Pair" [E.DataC "S" [E.DataC "Z" []],E.DataC "S" [E.DataC "Z" []]],E.DataC "Cons" [E.DataC "Pair" [E.DataC "S" [E.DataC "S" [E.DataC "Z" []]],E.DataC "S" [E.DataC "Z" []]],E.DataC "Nil" []]]],E.DataC "Cons" [E.DataC "Pair" [E.DataC "S" [E.DataC "Z" []],E.DataC "S" [E.DataC "Z" []]],E.DataC "Nil" []])]
-  --print $ matchPairsPretty 400 pairs functionsEnv
-  --let s = FT.parseTypeString "(Num a) => a -> a -> a"
-  --print $ matchTypeToReturn s (Concrete "Int")
-  --return ()
-  --let goal = "(Int, Int) -> Bool"
-  --let goal = "Int -> Int"
-  --let goal = "[Int] -> [Int]"
-  --let goal = "a -> Bool"
-  --putStrLn $ "Solutions: " ++ show (length $ linearSynth (_symsToLinearSynth env) goal [] (const $ Right []) 0)
   goal <- envToGoal env query
   solverChan <- newChan
   checkerChan <- newChan

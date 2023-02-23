@@ -1,12 +1,19 @@
-LOG_DIR=bench-logs-original
+LOG_DIR=logs
 TIMEOUT=60s
 CNT=10
 
 echo "Setup..."
-rm -r $LOG_DIR
-mkdir $LOG_DIR
+rm -rf $LOG_DIR 
+if (test $? -ne 0); then echo "Error removing directory"; exit 1; fi
+
+mkdir $LOG_DIR 
+if (test $? -ne 0); then echo "Error creating directory"; exit 1; fi
+
 stack build 1> /dev/null 2> /dev/null
+if (test $? -ne 0); then echo "Error building hoolge_plus"; exit 1; fi
+
 stack exec -- hplus generate --preset partialfunctions 1> /dev/null 2> /dev/null
+if (test $? -ne 0); then echo "Error generating database"; exit 1; fi
 
 echo "Benchmarking..."
 timeout -k 1s $TIMEOUT stack exec -- hplus "[Either a b] -> Either a b" --cnt=$CNT --out=$LOG_DIR/firstRight.log 1> /dev/null 2> /dev/null
@@ -96,6 +103,5 @@ echo 42/44
 timeout -k 1s $TIMEOUT stack exec -- hplus "[a] -> (a -> Bool) -> Int" --cnt=$CNT --out=$LOG_DIR/pred-match.log 1> /dev/null 2> /dev/null
 echo 43/44              
 timeout -k 1s $TIMEOUT stack exec -- hplus "Int -> [Int]" --cnt=$CNT --out=$LOG_DIR/singleList.log 1> /dev/null 2> /dev/null
-echo 44/44              
-
-## -y em todos; CNT???
+echo 44/44
+echo "Done"
