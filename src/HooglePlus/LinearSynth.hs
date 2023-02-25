@@ -17,13 +17,17 @@ import qualified SymbolicMatch.Env as Env
 import Control.Monad.State
 import Debug.Trace
 import System.Timeout(timeout)
+import qualified Data.Text as T
+
+--remove
+import System.IO
 
 data SearchState = SearchState {
     stAllParams :: [(Id, ArgumentType, Int)], -- params from both Hoogle+ and the new lambda
     stEnv :: [(String, FunctionSignature, Int)],
     stMaxLevel :: Int,
     stNextSym :: Int,
-    stSolutions :: [(Int, E.Expr)] -- (level, expr)
+    stSolutions :: [(Int, E.Expr, Bool)] -- (level, expr, symbolToReplace?)
 }
 
 --  In FunctionSignature types, the type Maybe Int is written as
@@ -33,29 +37,8 @@ matchTypeToReturn :: FunctionSignature
                   -> Maybe FunctionSignature
 matchTypeToReturn sig ret' = do
   substs <- matchTypes [] (_returnType sig) ret' 
-  if all (\s -> True {-checkSubst s (_constraints sig)-}) substs then
-    return $ applySubstsSig substs sig
-  else
-    Nothing
+  return $ applySubstsSig substs sig
 
-checkSubst :: (String, ArgumentType) -> [TypeConstraint] -> Bool
-checkSubst (var, ty) constrs =
-  let var2 = "Polymorphic " ++ show var in 
-    case filter (\(TypeConstraint var' _) -> var2 == var') constrs of
-      [] -> True -- var is not constrained
-      (TypeConstraint _ tyClass):t
-        | null t -> case ty of
-          (Concrete name) -> case lookup tyClass instances of
-            Nothing -> trace ("LinearSynth.hs: No class found") True
-            Just insts -> name `elem` insts
-          _ -> True
-        | otherwise -> error "Typeclass constrained more than once"
-  where 
-    instances :: [(String, [String])]
-    instances = [ ("Num", ["Int", "Float", "Int32", "Int64"])
-                , ("Ord", ["Int", "Float", "Int32", "Int64"])
-                , ("Eq",  ["Int", "Float", "Int32", "Int64"])] -- Fixme complete
-  
 matchTypes :: [(String, ArgumentType)] 
             -> ArgumentType 
             -> ArgumentType 
@@ -121,26 +104,36 @@ isTuple _ = False
 linearSynth :: [(String, FunctionSignature, Int)] -- env
             -> String           -- type string for the lambda being synthesized
             -> [(Id, RSchema)]  -- argList from original function
-            -> [([E.Expr], E.Expr)] -- input output examples
+            -> Either -- two options:
+                (E.Expr -> Either MatchError [(Int, [E.Expr], E.Expr)]) -- function if the examples cannot be used
+                ([([E.Expr], E.Expr)], Example) -- input output examples if well generated or 
             -> Int              -- next sym to use
             -> IO [String]     -- lambdas
-linearSynth env typeStr argList ioExamples nextSym = do
+linearSynth env typeStr argList ioExamplesOrFn nextSym = do
   let expr = E.Sym nextSym
   let initSt = SearchState{ stAllParams = argCandidates
                           , stEnv = env
                           , stMaxLevel = 2
                           , stNextSym = nextSym
                           , stSolutions = []}
-  let exprs = stSolutions $ execState (completeExpr expr [(nextSym, _returnType goal, 0)] False 0) initSt
-  let toMatch = map snd $ sortOn fst $ filterArgs $ exprs
+  let exprs = stSolutions $ execState (completeExpr expr [(nextSym, _returnType goal, 0)] False 0 0) initSt
+  --hPutStrLn stderr $ "EXPRS: " ++ (show $ length exprs)
+  --hPutStrLn stderr $ "goal is " ++ show goal
+  --hPutStrLn stderr $ "EXPRS(" ++ (show $ length exprs) ++ "): " ++ show (toString (map (\(_,e,_) -> e) exprs))
+  let toMatch ={- take 100000 $-} map (\(_,e,_)->e) $ sortOn (\(lev, _, sym) -> lev + if sym then 2 else 0) $ filterArgs $ exprs
   matched <- applyMatch toMatch
-  return $ toString $ map toLam $ take 10 $ filterValid $ filterSyms $ matched
+  --hPutStrLn stderr $ "matched: " ++ show (toString matched) ++ " toMatch: " ++ show (toString toMatch)
+  let filtered = filterValid $ filterSyms matched
+  return $ map replaceNamesTyg $ toString $ map toLam $ take 10 filtered
     where
       -- Data needed by the synthesis pipeline
+      tygIds :: [Int]
+      tygIds = take (length argList) $ iterate (+1) 0
+
       tygArgs :: [(Id, ArgumentType, Int)]
       tygArgs = map 
         (\((n, t), i) -> (n, _returnType $ parseTypeString (show t), i)) 
-        (zip argList (iterate (+1) 0))
+        (zip argList tygIds)
       
       goal = parseTypeString typeStr
 
@@ -158,10 +151,10 @@ linearSynth env typeStr argList ioExamples nextSym = do
 
       -- Functions that implement the synthesis pipeline
       -- remove expressions that do not use all the lambda arguments
-      filterArgs :: [(Int, E.Expr)] -> [(Int, E.Expr)]
+      filterArgs :: [(Int, E.Expr, Bool)] -> [(Int, E.Expr, Bool)]
       filterArgs es =  let
         vars = sort $ nub $ map (\(x,y,z)->z) lamArgs in
-        filter (\(_,e) -> vars `isInfixOf` (sort $ nub $ E.variables e)) es
+        filter (\(_,e, _) -> vars `isInfixOf` (sort $ nub $ E.variables e)) es
 
       -- remove expressions that have symbols to replace
       filterSyms :: [E.Expr] -> [E.Expr]
@@ -175,22 +168,55 @@ linearSynth env typeStr argList ioExamples nextSym = do
       toLam :: E.Expr -> E.Expr
       toLam p = E.Lam lamIds p
 
-      -- replace symbols if match
+      -- replace names of tygar parameters
+      -- because the to showExpr puts all variables starting with 0
+      replaceNamesTyg :: String -> String
+      replaceNamesTyg s = T.unpack $
+        foldr (\(_, _, i) r -> T.replace (T.pack $ "x" ++ show i) (T.pack $ "arg" ++ show (i + 1)) r) (T.pack s) tygArgs
+
+      -- replace symbols/test
       applyMatch :: [E.Expr] -> IO [E.Expr]
-      applyMatch [] = return []
-      applyMatch (e:es) = do
+      applyMatch es = case ioExamplesOrFn of
+        Left fn -> applyMatchFn fn es
+        Right (ioExs, tygEx) -> applyMatchIoExs ioExs tygEx es
+
+      -- replace symbols/test with function
+      applyMatchFn :: (E.Expr -> Either MatchError [(Int, [E.Expr], E.Expr)]) -> [E.Expr] -> IO [E.Expr]
+      applyMatchFn fn [] = return []
+      applyMatchFn fn (e:es) = do
+        --hPutStrLn stderr $ "TestingFn " ++ E.showExpr S.functionsNames e
+        let lam = toLam e
+        --hPutStrLn stderr (E.showExpr S.functionsNames e)
+        res <- timeout 100000 $ (let r = fn lam in r `seq` return r)
+        case res of
+          Just (Right cs) -> do
+            remaining <- applyMatchFn fn es
+            return $ (E.replaceSyms cs e) : remaining
+          Just _ -> applyMatchFn fn es
+          Nothing -> applyMatchFn fn es
+
+      -- replace symbols/test with examples
+      -- there is a single tygar example, otherwise applyMatchFn must be used
+      applyMatchIoExs :: [([E.Expr], E.Expr)] -> Example -> [E.Expr] -> IO [E.Expr]
+      applyMatchIoExs ioExs tygEx [] = hPutStrLn stderr ("Exs: " ++ show ioExs) >> return []
+      applyMatchIoExs ioExs tygEx (e:es) = do
+        --hPutStrLn stderr $ "Testing " ++ E.showExpr S.functionsNames e
+        let replacedTygArgs = 
+              foldr (\(id, val) r -> E.replace r (E.Var id) val) e (zip tygIds (input tygEx)) 
         let pairs = 
               map
                 (\(args, val) -> 
                   (foldr 
-                    (\(varId, argVal) r -> E.replace r (E.Var varId) argVal) e (zip lamIds args), val))
-                ioExamples
-        res <- timeout 100000 $ (let r = matchPairsPretty 200 pairs S.functionsEnv in r `seq` return r)
+                    (\(varId, argVal) r -> E.replace r (E.Var varId) argVal) replacedTygArgs (zip lamIds args), val))
+                ioExs
+        res <- timeout 100000 $ (let r = matchPairsPretty 300 pairs S.functionsEnv in r `seq` return r)
         case res of
           Just (Right cs) -> do
-            remaining <- applyMatch es
+            remaining <- applyMatchIoExs ioExs tygEx es
             return $ (E.replaceSyms cs e) : remaining
-          _ -> applyMatch es
+          _ -> do
+            --hPutStrLn stderr $ "Rejected (" ++ show res ++ "): " ++ E.showExpr S.functionsNames e
+            applyMatchIoExs ioExs tygEx es
         
       -- convert to string
       toString :: [E.Expr] -> [String]
@@ -202,20 +228,21 @@ linearSynth env typeStr argList ioExamples nextSym = do
                     -> Bool -- if expr contains a symbol that will be replaced only by match, not by complete
                             -- relevant because we want at most 1 symbol
                     -> Int -- level of the expressions (0 if variables, 1 is 1 app and 2 if has at least 2 applications)
+                    -> Int -- # applications , to sort
                     -> State SearchState ()
-      completeExpr expr [] symbolToMatch eLevel = do -- no more symbols to replace, so expr is complete
+      completeExpr expr [] symbolToMatch eLevel apps = do -- no more symbols to replace, so expr is complete
         state <- get
-        put state{stSolutions = (eLevel, expr) : stSolutions state}
-      completeExpr expr ((symbolId, symbolType, symbolLevel):symbols) symbolToMatch eLevel = do
+        put state{stSolutions = (apps, expr, symbolToMatch) : stSolutions state}
+      completeExpr expr ((symbolId, symbolType, symbolLevel):symbols) symbolToMatch eLevel apps = do
         state <- get
         -- all the arguments that can be used in place of symbolId
         let candidatesArgs = mapMaybe 
                 (\(aId, aType, aIndex) ->
                   case matchTypes [] aType symbolType of
                     Just sts
-                      | null sts -> 
+                      | all (\(k,v) -> case v of Polymorphic _ -> True; _ -> False) sts -> 
                         let expr' = E.replace expr (E.Sym symbolId) (E.Var aIndex) in
-                          Just (completeExpr expr' symbols symbolToMatch eLevel)
+                          Just (completeExpr expr' symbols symbolToMatch eLevel apps)
                       -- not supposed to replace type variables in arg types
                       | otherwise -> Nothing 
                     Nothing -> Nothing) 
@@ -231,7 +258,7 @@ linearSynth env typeStr argList ioExamples nextSym = do
                       newSyms = [E.Sym n | n <- newIds]
                       expr' = E.replace expr (E.Sym symbolId) (E.App (E.Var cIndex) newSyms)
                       symbols' = zip3 newIds (_argsType cType') (repeat $ symbolLevel + 1) in 
-                        Just (completeExpr expr' (symbols ++ symbols') symbolToMatch (symbolLevel + 1))
+                        Just (completeExpr expr' (symbols ++ symbols') symbolToMatch (symbolLevel + 1) (apps + 1))
                     Nothing -> Nothing) 
                 (stEnv state)
         
@@ -243,5 +270,5 @@ linearSynth env typeStr argList ioExamples nextSym = do
         -- add app nodes only its symbols are not so deep
         when (symbolLevel < stMaxLevel state) $ sequence_ candidatesApps
         -- if there are no symbols left for match, we can add one here
-        when (not symbolToMatch && not (isList symbolType) && not (isTuple symbolType)) $ completeExpr expr symbols True eLevel
+        when (not symbolToMatch && not (isList symbolType) && not (isTuple symbolType)) $ completeExpr expr symbols True eLevel apps
         return ()

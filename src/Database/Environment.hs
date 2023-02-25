@@ -80,7 +80,6 @@ generateEnv genOpts = do
     pkgFiles <- getFiles pkgOpts
     allEntriesByMdl <- filesToEntries pkgFiles True
     symsToLS <- filesToLinearSynthSymbs pkgFiles mdls
-    print symsToLS
     DD.cleanTmpFiles pkgOpts pkgFiles
     let entriesByMdl = filterEntries allEntriesByMdl mbModuleNames
     let ourEntries = nubOrd $ concat $ Map.elems entriesByMdl
