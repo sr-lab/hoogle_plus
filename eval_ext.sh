@@ -3,12 +3,12 @@ TIMEOUT1=60s
 TIMEOUT2=90s
 CNT1=10
 CNT2=35
-FLAG44=44
-FLAG15=15
+FLAG_SET_1=44
+FLAG_SET_2=15
 
-if (test $# -ne 0 && test $# -ne 1) || (test $# -eq 1 && test $1 -ne $FLAG44 && test $1 -ne $FLAG15) 
+if (test $# -ne 0 && test $# -ne 1) || (test $# -eq 1 && test $1 -ne $FLAG_SET_1 && test $1 -ne $FLAG_SET_2) 
 then 
-    echo "Usage: bash $0 [$FLAG44|$FLAG15]"
+    echo "Usage: bash $0 [$FLAG_SET_1|$FLAG_SET_2]"
     exit 1
 fi
 
@@ -28,7 +28,7 @@ if (test $? -ne 0); then echo "Error generating database"; exit 1; fi
 
 echo "Benchmarking..."
 
-if test $# -eq 0 || (test $# -eq 1 && test $1 -eq $FLAG44)
+if test $# -eq 0 || (test $# -eq 1 && test $1 -eq $FLAG_SET_1)
 then
     echo "Starting first set of 44 benchmarks" 
     timeout -k 1s $TIMEOUT1 stack exec -- hplus "[Either a b] -> Either a b" --example="[]" --cnt=$CNT1 --out=$LOG_DIR/firstRight.log 1> /dev/null 2> /dev/null
@@ -124,7 +124,7 @@ else
     echo "Skipping first set of 44 benchmarks"
 fi
 
-if test $# -eq 0 || (test $# -eq 1 && test $1 -eq $FLAG15)
+if test $# -eq 0 || (test $# -eq 1 && test $1 -eq $FLAG_SET_2)
 then
     echo "Starting second set of 15 benchmarks"
     timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> [Int]" --example="[([[1, 2, 3]], [2, 3, 4])]" --cnt=$CNT2 --out=$LOG_DIR/mapAdd.log 1> /dev/null 2> /dev/null
@@ -157,6 +157,10 @@ then
     echo 14/15
     timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> [Int] -> [Int]" --example="[([[1, 2, 3], [3, 4, 5]], [4, 6, 8])]" --cnt=$CNT2 --out=$LOG_DIR/addElemsTwoLists.log 1> /dev/null 2> /dev/null
     echo 15/15
+    timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> Int" --example="[([[1, 3, 1]], 11)]" --cnt=$CNT2 --out=$LOG_DIR/sumSquares.log 1> /dev/null 2> /dev/null
+    echo 16/15
+    timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> [Int]" --example="[([[1, 3, 2]], [1, 2])]" --cnt=$CNT2 --out=$LOG_DIR/removeMax.log 1> /dev/null 2> /dev/null
+    echo 17/15
     echo "Second set completed"
 else
     echo "Skipping second set of 15 benchmarks"

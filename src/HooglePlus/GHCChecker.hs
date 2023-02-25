@@ -422,10 +422,21 @@ runExampleChecks params env goalType prog examples checkerChan = do
             ((si, st):sts)
                 | (not . null) sts -> error "more than 1 lam to synthesize"
                 | otherwise -> do
-                    lams <- linearSynth env st argsList (ioExamples si cs) nextSym
-                    return $ sequence [map (\l -> (si, l)) lams]
+                    let ioExamplesGen = ioExamples si cs
+                    if all (\(args, val) -> all (null . Expr.symbols) args) ioExamplesGen {- && length examples <= 1-} then do
+                        lams <- linearSynth env st argsList (Right (ioExamplesGen, head examples)) nextSym
+                        return $ sequence [map (\l -> (si, l)) lams]
+                    else do
+                        lams <- linearSynth env st argsList (Left (matchFn si)) nextSym
+                        return $ sequence [map (\l -> (si, l)) lams]
             where
-                nextSym = (maximum $ Expr.symbols $ fst $ head $ pairs) + 1 
+                nextSym = (maximum $ Expr.symbols $ fst $ head $ pairs) + 1
+
+                -- if examples cannot be used, then the whole slution is tested
+                matchFn :: Int -> Expr.Expr -> Either Match.MatchError [(Int, [Expr.Expr], Expr.Expr)]
+                matchFn si lam = let
+                    pairs' = map (\(src, dst) -> (Expr.replace src (Expr.Sym si) lam, dst)) pairs in
+                        Match.matchPairsPretty 500 pairs' functionsEnv
 
                 -- extract input-output examples from cs
                 ioExamples :: Int -- symbol
