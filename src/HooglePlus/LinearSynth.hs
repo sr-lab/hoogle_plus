@@ -254,7 +254,7 @@ linearSynth env typeStr argList ioExamplesOrFn nextSym = do
                 (\(aId, aType, aIndex) ->
                   case matchTypes [] aType symbolType of
                     Just sts
-                      | null sts -> 
+                      | all (\(k,v) -> case v of Polymorphic _ -> True; _ -> False) sts -> 
                         let expr' = E.replace expr (E.Sym symbolId) (E.Var aIndex) in
                           Just (completeExpr expr' symbols symbolToMatch eLevel apps)
                       -- not supposed to replace type variables in arg types

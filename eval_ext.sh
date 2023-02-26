@@ -141,7 +141,7 @@ then
     echo 6/15
     timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> [Int] -> [Int]" --example="[([[0, 2, 4], [2, 4, 6], [2, 4])]" --cnt=$CNT2 --out=$LOG_DIR/listIntersect.log 1> /dev/null 2> /dev/null
     echo 7/15
-    timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> Int" --example="[([[1, 2, 0, 3, 0, 1]], 3)]" --cnt=$CNT2 --out=$LOG_DIR/indexConst.log 1> /dev/null 2> /dev/null
+    timeout -k 1s $TIMEOUT2 stack exec -- hplus "[a] -> a" --example="[([[1, 2, 0, 3, 0, 1]], 3)]" --cnt=$CNT2 --out=$LOG_DIR/indexConst.log 1> /dev/null 2> /dev/null
     echo 8/15
     timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> Bool" --example="[([[2, 3, 4]], Data.Bool.True), ([[2, 1, 4]], Data.Bool.False)]" --cnt=$CNT2 --out=$LOG_DIR/allGreaterThan.log 1> /dev/null 2> /dev/null
     echo 9/15
@@ -164,6 +164,8 @@ then
     timeout -k 1s $TIMEOUT2 stack exec -- hplus "(Bool, Bool) -> Bool" --example="[([(Data.Bool.True, Data.Bool.True)], Data.Bool.True)]" --cnt=$CNT2 --out=$LOG_DIR/andPair.log 1> /dev/null 2> /dev/null
     echo 18/15
     timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Bool] -> Bool" --example="[ ([[Data.Bool.False, Data.Bool.False]],Data.Bool.True), ([[Data.Bool.True, Data.Bool.False]], Data.Bool.False), ([[Data.Bool.True]],Data.Bool.True)]" --cnt=$CNT2 --out=$LOG_DIR/allEqBool.log 1> /dev/null 2> /dev/null
+    echo 19/15
+    timeout -k 1s $TIMEOUT2 stack exec -- hplus "[[a]] -> [[a]]" --example="[([ [[1, 3]]  ], [[3, 1]])]" --cnt=$CNT2 --out=$LOG_DIR/mapReverse.log 1> /dev/null 2> /dev/null
     echo 19/15
     echo "Second set completed"
 else
