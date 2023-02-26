@@ -296,6 +296,7 @@ runExampleChecks params env goalType prog examples checkerChan = do
                         -- FIXME: should set seed for widlcards in lams, otherwise may colide
                         -- synthesize lambdas for the function symbols and replace
                         synthRes <- liftIO $ synthLambdas (_symsToLinearSynth env) sts argList cs
+                        --liftIO $ hPutStrLn stderr $ "received: " ++ show (length synthRes)
                         case synthRes of
                             [] -> do
                                 liftIO $ writeChan checkerChan (MesgLog 1 "exampleCheck" ("Test \'" ++ show prog ++ "\': rejected by match (synthesizing lambdas)."))
@@ -399,11 +400,16 @@ runExampleChecks params env goalType prog examples checkerChan = do
         extractType :: T.Text -> T.Text -> Maybe (Int, String)
         extractType prefix msg = let
             -- holeLine: Found hole: _Sym0 :: Int -> Int -> Int
-            holeLine = (T.lines msg) !! 1 
+            holeLine = if ((T.cons '_' prefix) `T.isInfixOf` ((T.lines msg) !! 1)) 
+                then (T.lines msg) !! 1 -- if the first line is too long, the holeLine may be in third line
+                else (T.lines msg) !! 2
+
             -- hole: _Sym0 :: Int -> Int -> Int
             hole = snd $ T.break (== '_') holeLine
             -- symbolName: _Sym0
-            symbolName = head $ T.words hole
+            symbolName = case listToMaybe (T.words hole) of 
+                Nothing -> error $ "extractType: error reading name"
+                Just h -> h
             -- symbolType: Int -> Int -> Int
             symbolType = T.unwords $ drop 2 $ T.words hole in
                 case T.stripPrefix (T.cons '_' prefix) symbolName of
@@ -416,19 +422,16 @@ runExampleChecks params env goalType prog examples checkerChan = do
                      -> [(Int, String)] 
                      -> [(TC.Id, RSchema)] 
                      -> [(Int, [Expr.Expr], Expr.Expr)]
-                     -> IO [[(Int, String)]]
-        synthLambdas env sts argsList cs = case sts of
-            [] -> return []
-            ((si, st):sts)
-                | (not . null) sts -> error "more than 1 lam to synthesize"
-                | otherwise -> do
-                    let ioExamplesGen = ioExamples si cs
-                    if all (\(args, val) -> all (null . Expr.symbols) args) ioExamplesGen {- && length examples <= 1-} then do
-                        lams <- linearSynth env st argsList (Right (ioExamplesGen, head examples)) nextSym
-                        return $ sequence [map (\l -> (si, l)) lams]
-                    else do
-                        lams <- linearSynth env st argsList (Left (matchFn si)) nextSym
-                        return $ sequence [map (\l -> (si, l)) lams]
+                     -> IO [[(Int, String)]]    
+        synthLambdas env [] argsList cs = return []
+        synthLambdas env ((si, st):sts) argsList cs = do
+            let ioExamplesGen = ioExamples si cs
+            if all (\(args, val) -> all (null . Expr.symbols) args) ioExamplesGen {-&& length examples <= 1-} then do
+                lams <- linearSynth env st argsList (Right (ioExamplesGen, head examples)) nextSym
+                return $ sequence [map (\l -> (si, l)) lams]
+            else do
+                lams <- linearSynth env st argsList (Left (matchFn si)) nextSym
+                return $ sequence [map (\l -> (si, l)) lams]
             where
                 nextSym = (maximum $ Expr.symbols $ fst $ head $ pairs) + 1
 
@@ -438,6 +441,9 @@ runExampleChecks params env goalType prog examples checkerChan = do
                     pairs' = map (\(src, dst) -> (Expr.replace src (Expr.Sym si) lam, dst)) pairs in
                         Match.matchPairsPretty 500 pairs' functionsEnv
 
+                -- matchFn should always be used, because it always backtracking, so, different io examples.
+                -- think of (all ?f [1, 2, 3] == False): we can  have f 1 == False, f 2 == False, etc...
+                -- however, using ioExamples is much faster
                 -- extract input-output examples from cs
                 ioExamples :: Int -- symbol
                            -> [(Int, [Expr.Expr], Expr.Expr)] -- constraints
