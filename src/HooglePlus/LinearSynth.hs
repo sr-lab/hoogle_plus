@@ -58,7 +58,7 @@ checkSubst (var, ty) constrs =
     instances :: [(String, [String])]
     instances = [ ("Num", ["Int", "Float", "Int32", "Int64"])
                 , ("Ord", ["Int", "Float", "Int32", "Int64"])
-                , ("Eq",  ["Int", "Float", "Int32", "Int64"])] -- Fixme complete
+                , ("Eq",  ["Int", "Float", "Int32", "Int64", "Bool"])] -- Fixme complete
   
 matchTypes :: [(String, ArgumentType)] 
             -> ArgumentType 
@@ -138,8 +138,9 @@ linearSynth env typeStr argList ioExamplesOrFn nextSym = do
                           , stNextSym = nextSym
                           , stSolutions = []}
   let exprs = stSolutions $ execState (completeExpr expr [(nextSym, _returnType goal, 0)] False 0 0) initSt
+  hPutStrLn stderr $ "EXPRS: " ++ (show $ length exprs)
   --hPutStrLn stderr $ "EXPRS(" ++ (show $ length exprs) ++ "): " ++ show (toString (map (\(_,e,_) -> e) exprs))
-  let toMatch = map (\(_,e,_)->e) $ sortOn (\(lev, _, sym) -> lev + if sym then 1 else 0) $ filterArgs $ exprs
+  let toMatch ={- take 100000 $-} map (\(_,e,_)->e) $ sortOn (\(lev, _, sym) -> lev + if sym then 1 else 0) $ filterArgs $ exprs
   matched <- applyMatch toMatch
   let filtered = filterValid $ filterSyms matched
   return $ map replaceNamesTyg $ toString $ map toLam $ take 10 filtered
@@ -203,7 +204,7 @@ linearSynth env typeStr argList ioExamplesOrFn nextSym = do
       applyMatchFn fn [] = return []
       applyMatchFn fn (e:es) = do
         let lam = toLam e
-        hPutStrLn stderr (E.showExpr S.functionsNames e)
+        --hPutStrLn stderr (E.showExpr S.functionsNames e)
         res <- timeout 100000 $ (let r = fn lam in r `seq` return r)
         case res of
           Just (Right cs) -> do

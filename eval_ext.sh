@@ -163,6 +163,8 @@ then
     echo 17/15
     timeout -k 1s $TIMEOUT2 stack exec -- hplus "(Bool, Bool) -> Bool" --example="[([(Data.Bool.True, Data.Bool.True)], Data.Bool.True)]" --cnt=$CNT2 --out=$LOG_DIR/andPair.log 1> /dev/null 2> /dev/null
     echo 18/15
+    timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Bool] -> Bool" --example="[ ([[Data.Bool.False, Data.Bool.False]],Data.Bool.True), ([[Data.Bool.True, Data.Bool.False]], Data.Bool.False), ([[Data.Bool.True]],Data.Bool.True)]" --cnt=$CNT2 --out=$LOG_DIR/allEqBool.log 1> /dev/null 2> /dev/null
+    echo 19/15
     echo "Second set completed"
 else
     echo "Skipping second set of 15 benchmarks"
