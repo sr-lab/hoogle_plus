@@ -37,29 +37,8 @@ matchTypeToReturn :: FunctionSignature
                   -> Maybe FunctionSignature
 matchTypeToReturn sig ret' = do
   substs <- matchTypes [] (_returnType sig) ret' 
-  if all (\s -> True {-checkSubst s (_constraints sig)-}) substs then
-    return $ applySubstsSig substs sig
-  else
-    Nothing
+  return $ applySubstsSig substs sig
 
-checkSubst :: (String, ArgumentType) -> [TypeConstraint] -> Bool
-checkSubst (var, ty) constrs =
-  let var2 = "Polymorphic " ++ show var in 
-    case filter (\(TypeConstraint var' _) -> var2 == var') constrs of
-      [] -> True -- var is not constrained
-      (TypeConstraint _ tyClass):t
-        | null t -> case ty of
-          (Concrete name) -> case lookup tyClass instances of
-            Nothing -> trace ("LinearSynth.hs: No class found") True
-            Just insts -> name `elem` insts
-          _ -> True
-        | otherwise -> error "Typeclass constrained more than once"
-  where 
-    instances :: [(String, [String])]
-    instances = [ ("Num", ["Int", "Float", "Int32", "Int64"])
-                , ("Ord", ["Int", "Float", "Int32", "Int64"])
-                , ("Eq",  ["Int", "Float", "Int32", "Int64", "Bool"])] -- Fixme complete
-  
 matchTypes :: [(String, ArgumentType)] 
             -> ArgumentType 
             -> ArgumentType 

@@ -53,12 +53,8 @@ import Control.Concurrent
 import System.CPUTime (getCPUTime)
 import Text.Read(readMaybe)
 
-
--- FIXME remove some?
 import SymbolicMatch.Samples
 import qualified SymbolicMatch.Expr as Expr
-import qualified SymbolicMatch.Eval as Eval (eval)
-import qualified SymbolicMatch.State as State (init)
 import qualified SymbolicMatch.Match as Match (matchPairsPretty, MatchError(..))
 import qualified Data.Bool (bool)
 import System.IO (stderr, hPutStrLn)
@@ -295,9 +291,10 @@ runExampleChecks params env goalType prog examples checkerChan = do
                         when (not (allFunTys sts)) $ error "Non function symbol found after match"
                         -- FIXME: should set seed for widlcards in lams, otherwise may colide
                         -- synthesize lambdas for the function symbols and replace
-                        synthRes <- liftIO $ synthLambdas (_symsToLinearSynth env) sts argList cs
-                        --liftIO $ hPutStrLn stderr $ "received: " ++ show (length synthRes)
-                        case synthRes of
+                        synthRes <- liftIO $ mapM (\pair -> synthLambda (_symsToLinearSynth env) pair argList cs) sts
+                        -- if there are N lambdas to synhtesize, allCombinations will be a list of N-lists
+                        let allCombinations = sequence synthRes
+                        case allCombinations of
                             [] -> do
                                 liftIO $ writeChan checkerChan (MesgLog 1 "exampleCheck" ("Test \'" ++ show prog ++ "\': rejected by match (synthesizing lambdas)."))
                                 return []
@@ -418,20 +415,19 @@ runExampleChecks params env goalType prog examples checkerChan = do
                         Nothing -> error "extractType: error reading type"
                     Nothing -> Nothing
 
-        synthLambdas :: [(String, FunctionSignature, Int)]
-                     -> [(Int, String)] 
+        synthLambda :: [(String, FunctionSignature, Int)]
+                     -> (Int, String) 
                      -> [(TC.Id, RSchema)] 
                      -> [(Int, [Expr.Expr], Expr.Expr)]
-                     -> IO [[(Int, String)]]    
-        synthLambdas env [] argsList cs = return []
-        synthLambdas env ((si, st):sts) argsList cs = do
+                     -> IO [(Int, String)]    
+        synthLambda env (si, st) argsList cs = do
             let ioExamplesGen = ioExamples si cs
             if all (\(args, val) -> all (null . Expr.symbols) args) ioExamplesGen {-&& length examples <= 1-} then do
                 lams <- linearSynth env st argsList (Right (ioExamplesGen, head examples)) nextSym
-                return $ sequence [map (\l -> (si, l)) lams]
+                return $ map (\l -> (si, l)) lams
             else do
                 lams <- linearSynth env st argsList (Left (matchFn si)) nextSym
-                return $ sequence [map (\l -> (si, l)) lams]
+                return $ map (\l -> (si, l)) lams
             where
                 nextSym = (maximum $ Expr.symbols $ fst $ head $ pairs) + 1
 
