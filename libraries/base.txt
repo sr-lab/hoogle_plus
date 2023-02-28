@@ -87,8 +87,8 @@ null :: [a] -> Bool
 length :: [a] -> Int
 (!!) :: [a] -> Int -> a
 infixl 9 !!
-foldl :: (b -> a -> b) -> b -> [a] -> b
-foldl' :: (b -> a -> b) -> b -> [a] -> b
+foldl :: forall a b. (b -> a -> b) -> b -> [a] -> b
+foldl' :: forall a b. (b -> a -> b) -> b -> [a] -> b
 foldl1 :: (a -> a -> a) -> [a] -> a
 foldl1' :: (a -> a -> a) -> [a] -> a
 scanl :: (b -> a -> b) -> b -> [a] -> [b]
@@ -153,7 +153,7 @@ const :: a -> b -> a
 (.) :: (b -> c) -> (a -> b) -> a -> c
 infixr 9 .
 flip :: (a -> b -> c) -> b -> a -> c
-($) :: (a -> b) -> a -> b
+($) :: forall r a (b :: TYPE r). (a -> b) -> a -> b
 infixr 0 $
 (&) :: a -> (a -> b) -> b
 infixl 1 &
@@ -179,7 +179,6 @@ infixr 3 &&
 (||) :: Bool -> Bool -> Bool
 infixr 2 ||
 not :: Bool -> Bool
---otherwise :: Bool
 bool :: a -> a -> Bool -> a
 module Data.Type.Bool
 type family If cond tru fls
@@ -1092,8 +1091,8 @@ intercalate :: [a] -> [[a]] -> [a]
 transpose :: [[a]] -> [[a]]
 subsequences :: [a] -> [[a]]
 permutations :: [a] -> [[a]]
-foldl :: (b -> a -> b) -> b -> [a] -> b
-foldl' :: (b -> a -> b) -> b -> [a] -> b
+foldl :: forall a b. (b -> a -> b) -> b -> [a] -> b
+foldl' :: forall a b. (b -> a -> b) -> b -> [a] -> b
 foldl1 :: (a -> a -> a) -> [a] -> a
 foldl1' :: (a -> a -> a) -> [a] -> a
 foldr :: (a -> b -> b) -> b -> [a] -> b
