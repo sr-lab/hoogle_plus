@@ -14,7 +14,9 @@ exercises = [ "firstRight", "firstKey", "flatten", "repl-funcs", "containsEdge",
     "mapAdd", "mapSquare", "appendConst", "filterDiff", "getFirstOnes",
     "removeFirstOnes", "listIntersect", "indexConst", "allGreaterThan", 
     "dropConst", "filterGreaterThan", "filterPairs", "filterEq", 
-    "replicateConst", "addElemsTwoLists"]
+    "replicateConst", "addElemsTwoLists", "sumSquares", "removeMax", "nandPair",
+    "allEqBool", "mapReverse", "allJust", "andListPairs", "sumPairEntries", 
+    "filterPairsTyClass", "mapAddFloat", "mapAddLarge"]
 
 dir1 = "hoogle_plus_ext/logs"
 dir2 = "hoogle_plus_orig/logs"

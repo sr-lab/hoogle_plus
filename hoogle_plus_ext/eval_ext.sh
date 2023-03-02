@@ -126,7 +126,7 @@ fi
 
 if test $# -eq 0 || (test $# -eq 1 && test $1 = $FLAG_SET_2)
 then
-    echo "Starting second set of 15 benchmarks"
+    echo "Starting second set of 26 benchmarks"
     timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> [Int]" --example="[([[1, 2, 3]], [2, 3, 4])]" --cnt=$CNT2 --out=$LOG_DIR/mapAdd.log 1> /dev/null 2> /dev/null
     echo 1/26
     timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> [Int]" --example="[([[1, 2]], [1, 4])]" --cnt=$CNT2 --out=$LOG_DIR/mapSquare.log 1> /dev/null 2> /dev/null
@@ -182,6 +182,6 @@ then
 
     echo "Second set completed"
 else
-    echo "Skipping second set of 15 benchmarks"
+    echo "Skipping second set of 26 benchmarks"
 fi
 echo "Done"

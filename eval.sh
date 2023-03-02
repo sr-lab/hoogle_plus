@@ -16,7 +16,7 @@ then
 fi
 if test $# -eq 0 || (test $# -eq 1 && test $1 -eq $FLAG_SET_2)
 then
-    echo "15 benchmark on original Hoogle+ with examples"
+    echo "26 benchmark on original Hoogle+ with examples"
     cd hoogle_plus_examp/
     sh eval_examp.sh $*
     cd ..
