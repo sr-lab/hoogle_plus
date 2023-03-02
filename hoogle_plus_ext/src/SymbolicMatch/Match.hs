@@ -22,7 +22,7 @@ match :: Expr
     -> (S.State -> Either MatchError C.ConstrSet)
     -> Either MatchError C.ConstrSet
 
-match _ state WildCard ct
+match _ state WildCard ct -- = Left $ Exception "Error"
   | S.reachMaxDepth state = Left DepthReached
   | otherwise = ct (S.incDepth state)
 

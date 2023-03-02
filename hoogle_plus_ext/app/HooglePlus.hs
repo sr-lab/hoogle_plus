@@ -272,6 +272,7 @@ executeSearch synquidParams searchParams query examples handle = do
   readChan checkerChan >>= (handleMessages checkerChan startTime)
   where
     logLevel = searchParams ^. explorerLogLevel
+    readEnv :: IO Environment
     readEnv = do
       let envPathIn = Main.envPath synquidParams
       doesExist <- doesFileExist envPathIn

@@ -50,6 +50,8 @@ import qualified Data.Text as T
 import HooglePlus.FilterTest (parseTypeString)
 import System.IO
 
+import HooglePlus.LinearSynth (isHigherOrderSign)
+
 writeEnv :: FilePath -> Environment -> IO ()
 writeEnv path env = B.writeFile path (encode env)
 
@@ -145,10 +147,19 @@ filesToEntries fps renameFunc = do
     return $ Map.unionsWith (++) (symbolModule:declsByModuleByFile)
 
 filesToLinearSynthSymbs :: [FilePath] -> [String] -> IO [(String, FunctionSignature, Int)]
-filesToLinearSynthSymbs fps modules = foldr (\fp r -> do r' <- r; c <- readFileToLS fp; return $ c ++ r') (return []) fps
+filesToLinearSynthSymbs fps modules = do 
+  entries <- foldr (\fp r -> do r' <- r; c <- readFileToLS fp; return $ c ++ r') (return []) fps
+  return $ filter filterLS entries
   where 
     modulesText :: [T.Text]
     modulesText = map T.pack modules
+
+    -- remove Data.Function as it is useless, higher order functions and "high polymorphic" functions
+    filterLS :: (String, FunctionSignature, Int) -> Bool
+    filterLS (name, sign, _) = let 
+      blackLst = ["Data.Function", "curry", "from", "bool"] in 
+        (all (not . (`isInfixOf` name)) blackLst) &&
+            (not (isHigherOrderSign sign))
 
     readFileToLS :: FilePath -> IO [(String, FunctionSignature, Int)]
     readFileToLS fp = do 
@@ -185,7 +196,7 @@ filesToLinearSynthSymbs fps modules = foldr (\fp r -> do r' <- r; c <- readFileT
           -- current line is a declaration id :: type, but ignore because 
           -- that modules is not to consider
           | not modOk = parseLines t curMod modOk acc
-          -- current line is a declaration id :: type, and the modules is to consider
+          -- current line is a declaration id :: type, and the module is to consider
           | otherwise = let decl = T.breakOn (T.pack "::") h in
               let nm = T.unpack $ T.strip (fst decl) 
                   ty = T.unpack $ fromJust $ T.stripPrefix (T.pack "::") $ T.strip (snd decl) in
@@ -196,7 +207,7 @@ filesToLinearSynthSymbs fps modules = foldr (\fp r -> do r' <- r; c <- readFileT
                         then '(' : ((T.unpack curMod) ++ "." ++ (tail nm)) 
                         else (T.unpack curMod) ++ "." ++ nm 
                       in case S.lookupFun nmMod of -- FIXME (2 things):trace should be error? reject h.o.
-                        Nothing -> {-trace (printf "Function not in match: %s" (show nmMod)) $-} parseLines t curMod modOk acc
+                        Nothing -> parseLines t curMod modOk acc
                         Just i -> parseLines t curMod modOk ((nmMod, parseTypeString ty , i):acc)
 
 getFiles :: PackageFetchOpts -> IO [FilePath]
@@ -214,3 +225,4 @@ printStats env = do
   printf "types: %d; symbols: %d\n" typeCount symbolsCount
   printf "included types: %s\n" $ show (Map.keys typeMap)
   printf "included modules: %s\n" $ show (Set.elems modules)
+  printf "components in lambda-synthesizer: %d\n" (length (_symsToLinearSynth env))

@@ -3,12 +3,12 @@ TIMEOUT1=60s
 TIMEOUT2=90s
 CNT1=10
 CNT2=35
-FLAG44=44
-FLAG15=15
+FLAG_SET_1=S1
+FLAG_SET_2=S2
 
-if (test $# -ne 0 && test $# -ne 1) || (test $# -eq 1 && test $1 -ne $FLAG44 && test $1 -ne $FLAG15) 
+if (test $# -ne 0 && test $# -ne 1) || (test $# -eq 1 && test $1 = $FLAG_SET_1 && test $1 = $FLAG_SET_2) 
 then 
-    echo "Usage: bash $0 [$FLAG44|$FLAG15]"
+    echo "Usage: bash $0 [$FLAG_SET_1|$FLAG_SET_2]"
     exit 1
 fi
 
@@ -28,7 +28,7 @@ if (test $? -ne 0); then echo "Error generating database"; exit 1; fi
 
 echo "Benchmarking..."
 
-if test $# -eq 0 || (test $# -eq 1 && test $1 -eq $FLAG44)
+if test $# -eq 0 || (test $# -eq 1 && test $1 = $FLAG_SET_1)
 then
     echo "Starting first set of 44 benchmarks" 
     timeout -k 1s $TIMEOUT1 stack exec -- hplus "[Either a b] -> Either a b" --example="[]" --cnt=$CNT1 --out=$LOG_DIR/firstRight.log 1> /dev/null 2> /dev/null
@@ -124,39 +124,62 @@ else
     echo "Skipping first set of 44 benchmarks"
 fi
 
-if test $# -eq 0 || (test $# -eq 1 && test $1 -eq $FLAG15)
+if test $# -eq 0 || (test $# -eq 1 && test $1 = $FLAG_SET_2)
 then
     echo "Starting second set of 15 benchmarks"
     timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> [Int]" --example="[([[1, 2, 3]], [2, 3, 4])]" --cnt=$CNT2 --out=$LOG_DIR/mapAdd.log 1> /dev/null 2> /dev/null
-    echo 1/15
+    echo 1/26
     timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> [Int]" --example="[([[1, 2]], [1, 4])]" --cnt=$CNT2 --out=$LOG_DIR/mapSquare.log 1> /dev/null 2> /dev/null
-    echo 2/15
-    timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> [Int]" --example="[([[1, 2, 3]], [1, 2, 3, 4])]" --cnt=$CNT2 --out=$LOG_DIR/appendConst.log 1> /dev/null 2> /dev/null
-    echo 3/15
+    echo 2/26
+    timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> [Int]" --example="[([[1, 2, 3]], [1, 2, 3, 1000])]" --cnt=$CNT2 --out=$LOG_DIR/appendConst.log 1> /dev/null 2> /dev/null
+    echo 3/26
     timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> [Int]" --example="[([[1, 2, 3]], [1, 3])]" --cnt=$CNT2 --out=$LOG_DIR/filterDiff.log 1> /dev/null 2> /dev/null
-    echo 4/15
+    echo 4/26
     timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> [Int]" --example="[([[1, 1, 0, 1, 2]], [1, 1])]" --cnt=$CNT2 --out=$LOG_DIR/getFirstOnes.log 1> /dev/null 2> /dev/null
-    echo 5/15
+    echo 5/26
     timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> [Int]" --example="[([[1, 1, 0, 0, 1, 2]], [0, 0, 1, 2])]" --cnt=$CNT2 --out=$LOG_DIR/removeFirstOnes.log 1> /dev/null 2> /dev/null
-    echo 6/15
+    echo 6/26
     timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> [Int] -> [Int]" --example="[([[0, 2, 4], [2, 4, 6], [2, 4])]" --cnt=$CNT2 --out=$LOG_DIR/listIntersect.log 1> /dev/null 2> /dev/null
-    echo 7/15
-    timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> Int" --example="[([[1, 2, 0, 3, 0, 1]], 3)]" --cnt=$CNT2 --out=$LOG_DIR/indexConst.log 1> /dev/null 2> /dev/null
-    echo 8/15
+    echo 7/26
+    timeout -k 1s $TIMEOUT2 stack exec -- hplus "[a] -> a" --example="[([[1, 2, 0, 3, 0, 1]], 3)]" --cnt=$CNT2 --out=$LOG_DIR/indexConst.log 1> /dev/null 2> /dev/null
+    echo 8/26
     timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> Bool" --example="[([[2, 3, 4]], Data.Bool.True), ([[2, 1, 4]], Data.Bool.False)]" --cnt=$CNT2 --out=$LOG_DIR/allGreaterThan.log 1> /dev/null 2> /dev/null
-    echo 9/15
+    echo 9/26
     timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> [Int]" --example="[([[0, 0, 4, 4, 3]], [4, 3])]" --cnt=$CNT2 --out=$LOG_DIR/dropConst.log 1> /dev/null 2> /dev/null
-    echo 10/15
+    echo 10/26
     timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> [Int]" --example="[([[2, 0, 1, 3]], [2, 3])]" --cnt=$CNT2 --out=$LOG_DIR/filterGreaterThan.log 1> /dev/null 2> /dev/null
-    echo 11/15
-    timeout -k 1s $TIMEOUT2 stack exec -- hplus "[(Int, Int)] -> [(Int, Int)]" --example="[([[(1, 2), (3, 3), (4, 5)]], [(3, 3))]" --cnt=$CNT2 --out=$LOG_DIR/filterPairs.log 1> /dev/null 2> /dev/null
-    echo 12/15
+    echo 11/26
+    timeout -k 1s $TIMEOUT2 stack exec -- hplus "[(Int, Int)] -> [(Int, Int)]" --example="[([[(1, 2), (2, 2), (3, 0)]], [(2, 2)])]" --cnt=$CNT2 --out=$LOG_DIR/filterPairs.log 1> /dev/null 2> /dev/null
+    echo 12/26
     timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> [Int]" --example="[([[1, 2, 1, 3, 4, 4]], [1, 1])]" --cnt=$CNT2 --out=$LOG_DIR/filterEq.log 1> /dev/null 2> /dev/null
-    echo 13/15
-    timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int]" --example="[([], [3, 3, 3, 3, 3])]" --cnt=$CNT2 --out=$LOG_DIR/replicateConst.log 1> /dev/null 2> /dev/null
-    echo 14/15
+    echo 13/26
+    timeout -k 1s $TIMEOUT2 stack exec -- hplus "Int -> [Int]" --example="[([1], [1, 1])]" --cnt=$CNT2 --out=$LOG_DIR/replicateConst.log 1> /dev/null 2> /dev/null
+    echo 14/26
     timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> [Int] -> [Int]" --example="[([[1, 2, 3], [3, 4, 5]], [4, 6, 8])]" --cnt=$CNT2 --out=$LOG_DIR/addElemsTwoLists.log 1> /dev/null 2> /dev/null
-    echo 15/15
+    echo 15/26
+    timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> Int" --example="[([[1, 3, 1]], 11)]" --cnt=$CNT2 --out=$LOG_DIR/sumSquares.log 1> /dev/null 2> /dev/null
+    echo 16/26
+    timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> [Int]" --example="[([[1, 3, 2]], [1, 2])]" --cnt=$CNT2 --out=$LOG_DIR/removeMax.log 1> /dev/null 2> /dev/null
+    echo 17/26
+    timeout -k 1s $TIMEOUT2 stack exec -- hplus "(Bool, Bool) -> Bool" --example="[([(Data.Bool.True, Data.Bool.True)], Data.Bool.False), ([(Data.Bool.False, Data.Bool.False)], Data.Bool.True), ([(Data.Bool.True, Data.Bool.False)], Data.Bool.True), ([(Data.Bool.False, Data.Bool.True)], Data.Bool.True)]" --cnt=$CNT2 --out=$LOG_DIR/nandPair.log 1> /dev/null 2> /dev/null
+    echo 18/26
+    timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Bool] -> Bool" --example="[ ([[Data.Bool.False, Data.Bool.False]],Data.Bool.True), ([[Data.Bool.True, Data.Bool.False]], Data.Bool.False), ([[Data.Bool.True]],Data.Bool.True)]" --cnt=$CNT2 --out=$LOG_DIR/allEqBool.log 1> /dev/null 2> /dev/null
+    echo 19/26
+    timeout -k 1s $TIMEOUT2 stack exec -- hplus "[[a]] -> [[a]]" --example="[([[[1, 3]]], [[3, 1]])]" --cnt=$CNT2 --out=$LOG_DIR/mapReverse.log 1> /dev/null 2> /dev/null
+    echo 20/26
+    timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Maybe a] -> Bool" --example="[([[Data.Maybe.Nothing, Data.Maybe.Just 1]], Data.Bool.False), ([[Data.Maybe.Just 0, Data.Maybe.Just 0]], Data.Bool.True), ([[Data.Maybe.Just 0, Data.Maybe.Nothing]], Data.Bool.False)]" --cnt=$CNT2 --out=$LOG_DIR/allJust.log 1> /dev/null 2> /dev/null
+    echo 21/26
+    timeout -k 1s $TIMEOUT2 stack exec -- hplus "[(Bool,Bool)] -> Bool" --example="[([[(Data.Bool.True, Data.Bool.True), (Data.Bool.False, Data.Bool.False)]], Data.Bool.False), ([[(Data.Bool.True, Data.Bool.True), (Data.Bool.False, Data.Bool.False), (Data.Bool.True, Data.Bool.True)]], Data.Bool.False), ([[(Data.Bool.True, Data.Bool.True), (Data.Bool.True, Data.Bool.True)]], Data.Bool.True), ([[(Data.Bool.False, Data.Bool.False)]], Data.Bool.False)]" --cnt=$CNT2 --out=$LOG_DIR/andListPairs.log 1> /dev/null 2> /dev/null
+    echo 22/26
+    timeout -k 1s $TIMEOUT2 stack exec -- hplus "(Int, Int) -> Int" --example="[( [(1, 2)] , 3)]" --cnt=$CNT2 --out=$LOG_DIR/sumPairEntries.log 1> /dev/null 2> /dev/null
+    echo 23/26
+    timeout -k 1s $TIMEOUT2 stack exec -- hplus "(Eq a) => [(a, a)] -> [(a, a)]" --example="[([[(1, 2), (2, 2), (3, 0)]], [(2, 2)])]" --cnt=$CNT2 --out=$LOG_DIR/filterPairsTyClass.log 1> /dev/null 2> /dev/null
+    echo 24/26
+    timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Float] -> [Float]" --example="[([[1, 2, 3]], [1.5, 2.5, 3.5])]" --cnt=$CNT2 --out=$LOG_DIR/mapAddFloat.log 1> /dev/null 2> /dev/null
+    echo 25/26
+    timeout -k 1s $TIMEOUT2 stack exec -- hplus "[Int] -> [Int]" --example="[([[100, 200, 300]], [120, 220, 320])]" --cnt=$CNT2 --out=$LOG_DIR/mapAddLarge.log 1> /dev/null 2> /dev/null
+    echo 26/26
+
     echo "Second set completed"
 else
     echo "Skipping second set of 15 benchmarks"

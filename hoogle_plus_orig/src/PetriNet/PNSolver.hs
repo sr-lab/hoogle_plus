@@ -4,6 +4,7 @@
 
 module PetriNet.PNSolver (runPNSolver) where
 
+import Control.Concurrent(threadDelay)
 import Control.Concurrent.Chan
 import Control.Lens
 import Control.Monad.Logic
@@ -56,6 +57,7 @@ import Types.Experiments
 import Types.Program
 import Types.Solver
 import Types.Type
+import Control.Concurrent (threadDelay)
 
 
 encodeFunction :: Id -> AbstractSkeleton -> FunctionCode
@@ -704,6 +706,7 @@ findFirstN env dst st ps n
         modify $ over currentSolutions ((:) soln)
         currentSols <- gets $ view currentSolutions
         writeLog 2 "findFirstN" $ text "Current Solutions:" <+> pretty currentSols
+        liftIO $ threadDelay 500000
         findFirstN env dst st' ps' (n - 1)
 
 runPNSolver :: MonadIO m => Environment -> RType -> PNSolver m ()

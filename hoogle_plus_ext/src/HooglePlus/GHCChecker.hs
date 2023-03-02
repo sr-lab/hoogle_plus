@@ -51,12 +51,10 @@ import Control.Concurrent.Chan
 import Control.Monad.Trans.State
 import Control.Concurrent
 import System.CPUTime (getCPUTime)
+import Text.Read(readMaybe)
 
--- FIXME remove some?
 import SymbolicMatch.Samples
 import qualified SymbolicMatch.Expr as Expr
-import qualified SymbolicMatch.Eval as Eval (eval)
-import qualified SymbolicMatch.State as State (init)
 import qualified SymbolicMatch.Match as Match (matchPairsPretty, MatchError(..))
 import qualified Data.Bool (bool)
 import System.IO (stderr, hPutStrLn)
@@ -293,19 +291,25 @@ runExampleChecks params env goalType prog examples checkerChan = do
                         when (not (allFunTys sts)) $ error "Non function symbol found after match"
                         -- FIXME: should set seed for widlcards in lams, otherwise may colide
                         -- synthesize lambdas for the function symbols and replace
-                        case synthLambdas (_symsToLinearSynth env) sts argList cs of
+                        synthRes <- liftIO $ mapM (\pair -> synthLambda (_symsToLinearSynth env) pair argList cs) sts
+                        -- if there are N lambdas to synhtesize, allCombinations will be a list of N-lists
+                        let allCombinations = sequence synthRes
+                        case allCombinations of
                             [] -> do
                                 liftIO $ writeChan checkerChan (MesgLog 1 "exampleCheck" ("Test \'" ++ show prog ++ "\': rejected by match (synthesizing lambdas)."))
                                 return []
                             lams@(_:_) -> do
                                 let progsWithLams = [replaceLamsInProg l prog'' | l <- lams]
                                 mbsProgs <- mapM replaceWilcards progsWithLams
-                                return $ catMaybes mbsProgs
+                                let r = catMaybes mbsProgs
+                                return $ r
     where
         (modules, funcSig, _, argList) = extractSolution env goalType prog
 
         progWithGoodSymNames :: UProgram
-        progWithGoodSymNames = changeSymbolsNames $ removeTc prog
+        progWithGoodSymNames = case removeTcargs (changeSymbolsNames $ removeTc prog) of
+            Just prog -> prog
+            Nothing -> error "prog is simply a tcarg"
 
         -- SymbolicMatch does not support all functions, and raises an error
         -- we prefer to avoid error and skip to the next
@@ -392,37 +396,61 @@ runExampleChecks params env goalType prog examples checkerChan = do
         -- nothing means that the msg does not have a hole with that prefix
         extractType :: T.Text -> T.Text -> Maybe (Int, String)
         extractType prefix msg = let
-            -- holeLine: Found h>ole: _Sym0 :: Int -> Int -> Int
-            holeLine = (T.lines msg) !! 1 
+            -- holeLine: Found hole: _Sym0 :: Int -> Int -> Int
+            holeLine = if ((T.cons '_' prefix) `T.isInfixOf` ((T.lines msg) !! 1)) 
+                then (T.lines msg) !! 1 -- if the first line is too long, the holeLine may be in third line
+                else (T.lines msg) !! 2
+
             -- hole: _Sym0 :: Int -> Int -> Int
             hole = snd $ T.break (== '_') holeLine
             -- symbolName: _Sym0
-            symbolName = head $ T.words hole
+            symbolName = case listToMaybe (T.words hole) of 
+                Nothing -> error $ "extractType: error reading name"
+                Just h -> h
             -- symbolType: Int -> Int -> Int
             symbolType = T.unwords $ drop 2 $ T.words hole in
                 case T.stripPrefix (T.cons '_' prefix) symbolName of
-                    Just t -> Just (read (T.unpack $ t), T.unpack symbolType)
+                    Just t -> case readMaybe (T.unpack t) :: Maybe Int of
+                        Just int -> Just (int, T.unpack symbolType)
+                        Nothing -> error "extractType: error reading type"
                     Nothing -> Nothing
 
-        synthLambdas :: [(String, FunctionSignature, Int)]
-                     -> [(Int, String)] 
+        synthLambda :: [(String, FunctionSignature, Int)]
+                     -> (Int, String) 
                      -> [(TC.Id, RSchema)] 
                      -> [(Int, [Expr.Expr], Expr.Expr)]
-                     -> [[(Int, String)]]
-        synthLambdas env sts argsList cs = case sts of
-            [] -> []
-            ((si, st):sts)
-                | (not . null) sts -> error "more than 1 lam to synthesize"
-                | otherwise -> let 
-                    lams = linearSynth env st argsList (matchFn si) nextSym in
-                        sequence [map (\l -> (si, l)) lams]
+                     -> IO [(Int, String)]    
+        synthLambda env (si, st) argsList cs = do
+            let ioExamplesGen = ioExamples si cs
+            if all (\(args, val) -> all (null . Expr.symbols) args) ioExamplesGen {-&& length examples <= 1-} then do
+                lams <- linearSynth env st argsList (Right (ioExamplesGen, head examples)) nextSym
+                return $ map (\l -> (si, l)) lams
+            else do
+                lams <- linearSynth env st argsList (Left (matchFn si)) nextSym
+                return $ map (\l -> (si, l)) lams
             where
-                nextSym = (maximum $ Expr.symbols $ fst $ head $ pairs) + 1 
+                nextSym = (maximum $ Expr.symbols $ fst $ head $ pairs) + 1
 
+                -- if examples cannot be used, then the whole slution is tested
                 matchFn :: Int -> Expr.Expr -> Either Match.MatchError [(Int, [Expr.Expr], Expr.Expr)]
                 matchFn si lam = let
                     pairs' = map (\(src, dst) -> (Expr.replace src (Expr.Sym si) lam, dst)) pairs in
-                        Match.matchPairsPretty 400 pairs' functionsEnv
+                        Match.matchPairsPretty 500 pairs' functionsEnv
+
+                -- matchFn should always be used, because it always backtracking, so, different io examples.
+                -- think of (all ?f [1, 2, 3] == False): we can  have f 1 == False, f 2 == False, etc...
+                -- however, using ioExamples is much faster
+                -- extract input-output examples from cs
+                ioExamples :: Int -- symbol
+                           -> [(Int, [Expr.Expr], Expr.Expr)] -- constraints
+                           -> [([Expr.Expr], Expr.Expr)]
+                ioExamples symId = 
+                    mapMaybe 
+                        (\(symId', args, val) -> 
+                            if symId == symId' then Just (args, val) 
+                            else Nothing )
+                        
+
         
         -- try replace wildcard generated by match with default values
         replaceWilcards :: MonadIO m => UProgram -> FilterTest m (Maybe UProgram)
