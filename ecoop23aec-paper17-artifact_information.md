@@ -1,13 +1,13 @@
 # Artifact Submission Template
 
 Title of the submitted paper: Synthesis of Constants and lambda-abstractions in Petri-net-based Synthesis using Symbolic Execution
-ECOOP submission number for the paper: 65
+ECOOP submission number for the paper: 150
 
 ## Overview: What does the artifact comprise?
 
 * The artifact is a **Docker image** containing the **Haskell source code** of the extension to Hoogle+ described in the paper. The artifact is already compiled and ready to use. For evaluation purposes, it also includes the two versions of Hoogle. 
-* The Docker image can be found at `https://drive.google.com/drive/folders/1PdpeEQQU1E-C8hedV_37mAn9EPs_EcLm?usp=sharing`
-* We claim the functional and reusable badge. 
+* The Docker image can be found at FIXME
+* We claim the functional and reusable badge. FIXME available
 
 ## Claims about the artifact’s functionality to be evaluated by the committee
 
@@ -26,10 +26,10 @@ In our paper, we propose an extension to the Hoogle+ program synthesizer so that
 * The artifact is *documented*. The code is commented and we map each algorithm on the paper to a function/module in the artifact:
     - Algorithm 1: function eval in `/home/hoogle_plus_ext/src/SymbolicMatch/Eval.hs`;
     - Algorithm 2: functions main and executeSearch in `/home/hoogle_plus_ext/app/HooglePlus.hs`;
-    - Algorithm 3: functions executeCheck and runExampleChecks in `/home/hoogle_plus_ext/src/HooglePlus/GHCChecker.hs`;
-    - Algorithm 4: function linearSynth in `/home/hoogle_plus_ext/src/HooglePlus/LinearSynth.hs`;
-    - Algorithm 5: function giveArgs and constant exprs in `/home/hoogle_plus_ext/src/HooglePlus/LinearSynth.hs`;
-    - Algorithm 6: functions replaceLamsInProg and replaceSymsInProg in `/home/hoogle_plus_ext/src/HooglePlus/GHCChecker.hs`
+    - Algorithm 3: functions executeCheck and runExampleChecks in `/home/hoogle_plus_ext/src/HooglePlus/GHCChecker.hs`, and function REPLACE-WILDCARD corresponds to functions replaceLamsInProg and replaceSymsInProg in `/home/hoogle_plus_ext/src/HooglePlus/GHCChecker.hs` and function CONVERT-TO-H+ corresponds to showExpr, in (`/home/hoogle_plus_ext/src/SymbolicMatch/Expr.hs`);
+    - Algorithm 4: function synthLamba `/home/hoogle_plus_ext/src/HooglePlus/GHCChecker.hs` and function linearSynth in `/home/hoogle_plus_ext/src/HooglePlus/LinearSynth.hs`;
+    - Algorithm 5: function completeExpr in `/home/hoogle_plus_ext/src/HooglePlus/LinearSynth.hs`;
+    - Algorithm 6: function applyMatch in `/home/hoogle_plus_ext/src/HooglePlus/LinearSynth.hs`;
     - The addition of the wildcard component is done by function generateEnv, in `/home/hoogle_plus_ext/src/Database/Environment.hs`
     - The unification algorithm is implemented in function match (`/home/hoogle_plus_ext/src/SymbolicMatch/Match.hs`). Each case of this function is related to an inference rule presented in the paper.
 
@@ -40,14 +40,14 @@ In our paper, we propose an extension to the Hoogle+ program synthesizer so that
 ## Artifact Requirements
 Only `docker` is required.
 
-## Getting Started
+## Getting Started FIXME url
 * The artifact is delivered as a docker image. Download the image from https://drive.google.com/drive/folders/1PdpeEQQU1E-C8hedV_37mAn9EPs_EcLm?usp=sharing and run the following command in the folder where the image is stored:
   ```
-  docker load < paper65_r1_image.tar.gz
+  docker load < paper65_r1_image.tar.gz FIXME NAME
   ```
   To run the image,
   ```
-  docker run -it paper65_aec:latest
+  docker run -it paper65_aec:latest FIXME NAME
   ```
 
 * The artifact includes the extension to the Hoogle+, in folder `/home/hoogle_plus_ext/`, as well as two versions of Hoogle+, for comparasion and evaluation.
@@ -55,15 +55,15 @@ Only `docker` is required.
 * All three versions are compiled and ready to use.
 * The script `/home/eval.sh` does the following:
     - It runs the first set of 44 benchmarks that do not require examples in the extension and the original version of Hoogle+;
-    - It runs the second set of 15 benchmarks that use input-output examples in the extension and in the version of Hoogle+ that supports examples;
-    - It takes 2 hours approx; to run only the second set of 15 benchmarks (which is the most important set because its benchmarks require the generation of constants and lambda-abstractions), pass 15 as an argument (`sh eval.sh 15`), and this should take 40 minutes;
+    - It runs the second set of 26 benchmarks that use input-output examples in the extension and in the version of Hoogle+ that supports examples; FIXME TIME
+    - It takes 2 hours approx; to run only the second set of 26 benchmarks (which is the most important set because its benchmarks require the generation of constants and lambda-abstractions), pass S2 as an argument (`sh eval.sh S2`), and this should take 40 minutes; FIXME TIME
     - It prints a LaTeX document in the `stdout`;
 * The scripts `/home/hoogle_plus_ext/eval_ext.hs`, `/home/hoogle_plus_examp/eval_examp.hs` and `/home/hoogle_plus_orig/eval_orig.hs` can be used separately to run the benchmarks on specific versions.         
-  - Each one creates a folder `logs` (for instance, the `eval_ext.sh` creates a folder `/home/hoogle_plus_ext/logs`), containing a log file for each benchmark (with the produced solutions and times). The arguments `15` and `44` can be used in script `/home/hoogle_plus_ext/eval_ext.hs`, to select one of both sets of benchmarks.
-  - For an even shorter evaluation, run the 15 benchmarks (only on the extension) that take input-output examples (approx. 20 minutes). This is the most relevant set of benchmarks, as most of them require the generation of constants and lambda abstractions, which is the key contribution of our work.
+  - Each one creates a folder `logs` (for instance, the `eval_ext.sh` creates a folder `/home/hoogle_plus_ext/logs`), containing a log file for each benchmark (with the produced solutions and times). The arguments `S2` and `S1` can be used in script `/home/hoogle_plus_ext/eval_ext.hs`, to select one of both sets of benchmarks.           FIXME TIME
+  - For an even shorter evaluation, run the 26 benchmarks (only on the extension) that take input-output examples (approx. 20 minutes). This is the most relevant set of benchmarks, as most of them require the generation of constants and lambda abstractions, which is the key contribution of our work.
     ```
     cd /home/hoogle_plus_ext
-    sh eval_ext.sh 15
+    sh eval_ext.sh S2
     ```
   - Each log file contains, for each solution, a line with the output and a line with the times. In the case of Hoogle+ and Hoogle+ with examples, there is a single time: the total time spent. In the case of the extension, the time spent replacing wildcards is also provided, and this is the first value of the line.
   
@@ -84,10 +84,3 @@ Only `docker` is required.
     cd /home/hoogle_plus_orig
     stack exec -- hplus "[Int] -> [Int]" --cnt=35
     ```
-* Different platforms imply different performances, especially inside docker containers. For instance, synthesizing the first three solutions of the problem mapAdd, from the second set of benchmarks, inside a docker container, may take different times:
-  - On an AMD Ryzen 5 5500U laptop (U stands for ultra-low consumption) with 12 GB RAM, it takes 68 seconds.
-  - On an AMD Ryzen 5 5600G desktop with 16 GB RAM, it takes 37 seconds.
-* If the extension cannot produce three solutions for mappAdd within the timeout of 90 seconds, feel free to increase the timeout of the evaluation script, or pick some problems and run them individually (recall that the most important set of benchmarks is the second as the problems require the generation of input-output examples). The evaluation script allows a different timeout for each benchmark.
-  - To change the timeout of the first set of benchmarks, edit the variable `TIMEOUT1` of `/home/hoogle_plus_ext/eval_ext.sh` and the variable `TIMEOUT` of `/home/hoogle_plus_orig/eval_orig.sh`.
-  - To change the timeout of the second set of benchmarks, edit the variable `TIMEOUT2` of `/home/hoogle_plus_ext/eval_ext.sh` and the variable `TIMEOUT` of `/home/hoogle_plus_examp/eval_examp.sh`. 
-  - Each variable should have a floating point number and optionally a suffix specifying the unit of time (the default is seconds). For instance, `90s` stands for 90 seconds.
