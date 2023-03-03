@@ -43,11 +43,11 @@ Only `docker` is required.
 ## Getting Started FIXME url
 * The artifact is delivered as a docker image. Download the image from https://drive.google.com/drive/folders/1PdpeEQQU1E-C8hedV_37mAn9EPs_EcLm?usp=sharing and run the following command in the folder where the image is stored:
   ```
-  docker load < paper65_r1_image.tar.gz FIXME NAME
+  docker load < paper150_r2_image.tar.gz
   ```
   To run the image,
   ```
-  docker run -it paper65_aec:latest FIXME NAME
+  docker run -it paper150_aec:latest FIXME error naming with/latest
   ```
 
 * The artifact includes the extension to the Hoogle+, in folder `/home/hoogle_plus_ext/`, as well as two versions of Hoogle+, for comparasion and evaluation.
