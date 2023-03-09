@@ -1,5 +1,5 @@
-# Extension to Hoogle+
-We extended the Hoogle+ program synthesizer for Haskell, so that it supports the generation of constants and input-output examples.
+# Hoogle⋆: Synthesis of Constants and λ-abstractions in Petri-net-based Synthesis using Symbolic Execution
+We extended the Hoogle+ program synthesizer for Haskell, so that it supports the generation of constants and λ-abstractions.
 
 # Setup
 
