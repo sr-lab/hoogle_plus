@@ -6,8 +6,8 @@ ECOOP submission number for the paper: 150
 ## Overview: What does the artifact comprise?
 
 * The artifact is a **Docker image** containing the **Haskell source code** of the extension to Hoogle+ described in the paper. The artifact is already compiled and ready to use. For evaluation purposes, it also includes the two versions of Hoogle. 
-* The Docker image can be found at FIXME
-* We claim the functional and reusable badge. FIXME available
+* The Docker image can be found at 
+* We claim the functional, reusable, and available badges.
 
 ## Claims about the artifact’s functionality to be evaluated by the committee
 
@@ -34,38 +34,41 @@ In our paper, we propose an extension to the Hoogle+ program synthesizer so that
     - The unification algorithm is implemented in function match (`/home/hoogle_plus_ext/src/SymbolicMatch/Match.hs`). Each case of this function is related to an inference rule presented in the paper.
 
 ## Claims about the artifact’s reusability to be evaluated by the committee
-* To change the way the ocurrences of the wildcard component are replaced, simply redefine the function runExampleChecks (`/home/hoogle_plus_ext/src/HooglePlus/GHCChecker.hs`).
+* To change the way the occurrences of the wildcard component are replaced, simply redefine the function runExampleChecks (`/home/hoogle_plus_ext/src/HooglePlus/GHCChecker.hs`).
 * The code is documented, which simplifies future extensions.
+
+## Claims about the artifact’s availability to be evaluated by the committee
+* We plan to place the artifact on [DARTS](https://drops.dagstuhl.de/opus/institut_darts.php) and agree with a Creative Commons license.
 
 ## Artifact Requirements
 Only `docker` is required.
 
-## Getting Started FIXME url
-* The artifact is delivered as a docker image. Download the image from https://drive.google.com/drive/folders/1PdpeEQQU1E-C8hedV_37mAn9EPs_EcLm?usp=sharing and run the following command in the folder where the image is stored:
+## Getting Started
+* The artifact is delivered as a docker image. Download the image from https://drive.google.com/file/d/1Pdsp_2tcAGr-NUIMyBTTspkILYCbvlM6/view?usp=sharing and run the following command in the folder where the image is stored:
   ```
   docker load < paper150_r2_image.tar.gz
   ```
   To run the image,
   ```
-  docker run -it paper150_aec:latest FIXME error naming with/latest
+  docker run -it paper150_aec:latest
   ```
 
-* The artifact includes the extension to the Hoogle+, in folder `/home/hoogle_plus_ext/`, as well as two versions of Hoogle+, for comparasion and evaluation.
+* The artifact includes Hoogle*, the extension to the Hoogle+, in folder `/home/hoogle_plus_ext/`, as well as two versions of Hoogle+, for comparasion and evaluation.
 
 * All three versions are compiled and ready to use.
 * The script `/home/eval.sh` does the following:
-    - It runs the first set of 44 benchmarks that do not require examples in the extension and the original version of Hoogle+;
-    - It runs the second set of 26 benchmarks that use input-output examples in the extension and in the version of Hoogle+ that supports examples; FIXME TIME
-    - It takes 2 hours approx; to run only the second set of 26 benchmarks (which is the most important set because its benchmarks require the generation of constants and lambda-abstractions), pass S2 as an argument (`sh eval.sh S2`), and this should take 40 minutes; FIXME TIME
+    - It runs both Hoogle* and the original version of Hoogle+ in the first set of 44 benchmarks, which do not require examples;
+    - It runs both Hoogle* and the version of Hoogle+ that supports examples in the second set of 26 benchmarks, which use input-output examples;
+    - It takes 2 hours approx; to run only the second set of 26 benchmarks (which is the most important set because its benchmarks require the generation of constants and lambda-abstractions), pass S2 as an argument (`sh eval.sh S2`), and this should take 80 minutes;
     - It prints a LaTeX document in the `stdout`;
 * The scripts `/home/hoogle_plus_ext/eval_ext.hs`, `/home/hoogle_plus_examp/eval_examp.hs` and `/home/hoogle_plus_orig/eval_orig.hs` can be used separately to run the benchmarks on specific versions.         
-  - Each one creates a folder `logs` (for instance, the `eval_ext.sh` creates a folder `/home/hoogle_plus_ext/logs`), containing a log file for each benchmark (with the produced solutions and times). The arguments `S2` and `S1` can be used in script `/home/hoogle_plus_ext/eval_ext.hs`, to select one of both sets of benchmarks.           FIXME TIME
-  - For an even shorter evaluation, run the 26 benchmarks (only on the extension) that take input-output examples (approx. 20 minutes). This is the most relevant set of benchmarks, as most of them require the generation of constants and lambda abstractions, which is the key contribution of our work.
+  - Each one creates a folder `logs` (for instance, the `eval_ext.sh` creates a folder `/home/hoogle_plus_ext/logs`), containing a log file for each benchmark (with the synthesized solutions and times). The arguments `S2` and `S1` can be used in script `/home/hoogle_plus_ext/eval_ext.hs`, to select one of both sets of benchmarks.
+  - For an even shorter evaluation, run Hoogle* the 26 benchmarks that take input-output examples (approx. 40 minutes). This is the most relevant set of benchmarks, as most of them require the generation of constants and lambda abstractions, which is the key contribution of our work.
     ```
     cd /home/hoogle_plus_ext
     sh eval_ext.sh S2
     ```
-  - Each log file contains, for each solution, a line with the output and a line with the times. In the case of Hoogle+ and Hoogle+ with examples, there is a single time: the total time spent. In the case of the extension, the time spent replacing wildcards is also provided, and this is the first value of the line.
+  - Each log file contains, for each solution, a line with the output and a line with the times. In the case of Hoogle+ and Hoogle+ with examples, there is a single time: the total time spent. In the case of Hoogle*, the time spent replacing wildcards is also provided, and this is the first value of the line.
   
 * To run a problem in the extension, `cd /home/hoogle_plus_ext/` and use `stack exec`. For instance, if the goal is to synthesize a function `[Int] -> [Int]` that adds 1 to each element of the input list, we can supply the input-output example `[([[1, 2, 3]], [2, 3, 4])]`:
     ```
@@ -74,12 +77,12 @@ Only `docker` is required.
     ```
     Note that the argument `--cnt` specifies the number of incomplete functions that should be generated, and we have used `35` in benchmarks that require input-output examples, as explained in the paper.
 
-* To the previous problem in the version of Hoogle+ with examples:
+* To run the previous problem in the version of Hoogle+ with examples:
     ```
     cd /home/hoogle_plus_examp
     stack exec -- hplus --json='{"query":"[Int] -> [Int]", "inExamples":[{"inputs":["[1, 2, 3]"],"output":"[2, 3, 4]"}]}' --cnt=35
     ```
-* The original version of Hoogle+ does not support examples, so we only can provide a query type:
+* The run original version of Hoogle+ does not support examples, so we only can provide a query type:
     ```
     cd /home/hoogle_plus_orig
     stack exec -- hplus "[Int] -> [Int]" --cnt=35
