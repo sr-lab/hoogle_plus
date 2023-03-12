@@ -51,9 +51,9 @@ defaultDts = [
   defaultFloat, defaultDouble]
 
 defaultList = Pos (initialPos "List") $ DataDecl "List" ["a"] [] [
-    ConstructorSig "Nil"  $
+    {-ConstructorSig "Nil"  $
       ScalarT (DatatypeT "List" [ScalarT (TypeVarT Map.empty "a") ftrue] []) ftrue
-  , ConstructorSig "Cons" $
+  ,-} ConstructorSig "Cons" $
       FunctionT "x" (ScalarT (TypeVarT Map.empty "a") ftrue)
       (FunctionT "xs"
         (ScalarT (DatatypeT "List" [ScalarT (TypeVarT Map.empty "a") ftrue] []) ftrue)

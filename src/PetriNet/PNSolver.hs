@@ -28,6 +28,7 @@ import Debug.Trace
 import Language.Haskell.Exts.Parser (ParseResult(..), parseExp)
 import Text.Printf
 import System.IO
+import Control.Concurrent
 
 import Database.Convert
 import Database.Generate
@@ -704,6 +705,7 @@ findFirstN env dst st ps n
         modify $ over currentSolutions ((:) soln)
         currentSols <- gets $ view currentSolutions
         writeLog 2 "findFirstN" $ text "Current Solutions:" <+> pretty currentSols
+        liftIO $ threadDelay 500000
         findFirstN env dst st' ps' (n - 1)
 
 runPNSolver :: MonadIO m => Environment -> RType -> PNSolver m ()
