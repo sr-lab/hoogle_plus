@@ -28,7 +28,7 @@ RUN apt-get install -y python3
 ADD hoogle_plus_ext /home/hoogle_plus_ext/
 ADD hoogle_plus_orig /home/hoogle_plus_orig/
 ADD hoogle_plus_examp /home/hoogle_plus_examp/
-ADD eval.sh results.py /home/
+ADD health-check.sh eval.sh results.py /home/
 
 # Build Hoogle Plus
 RUN cd /home/hoogle_plus_ext && stack build
