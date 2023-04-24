@@ -135,9 +135,12 @@ check :: MonadIO m
        -> RProgram -- program to be checked
        -> RSchema -- goal type to be checked against
        -> Chan Message -- message channel for logging
-       -> FilterTest m (Maybe AssociativeExamples) -- return Nothing is check fails, otherwise return a list of updated examples
-check env searchParams examples program goalType solverChan =
-    runGhcChecks searchParams env (lastType $ toMonotype goalType) examples program
+       -> FilterTest m [(RProgram, AssociativeExamples)] -- return Nothing is check fails, otherwise return a list of updated examples
+check env searchParams examples program goalType solverChan = do
+    mbAssoc <- runGhcChecks searchParams env (lastType $ toMonotype goalType) examples program
+    case mbAssoc of
+        Nothing -> return []
+        Just assoc -> return [(program, assoc)]
 
 -- validate type signiture, run demand analysis, and run filter test
 -- checks the end result type checks; all arguments are used; and that the program will not immediately fail

@@ -61,6 +61,7 @@ import Types.Solver
 import Types.Type
 import Types.IOFormat
 import Types.TypeChecker
+import Types.Filtering
 
 encodeFunction :: Id -> AbstractSkeleton -> FunctionCode
 encodeFunction id t | pairProj `isPrefixOf` id =
@@ -733,6 +734,7 @@ checkSolution :: MonadIO m
               -> [Example] 
               -> RProgram 
               -> BackTrack m SearchResult
+
 checkSolution env goal examples code = do
     solutions <- gets $ view (searchState . currentSolutions)
     mapping <- gets $ view (typeChecker . nameMapping)
@@ -743,13 +745,15 @@ checkSolution env goal examples code = do
     (checkResult, fState') <- withTime TypeCheckTime $ 
         liftIO $ runStateT (check env params examples code' goal msgChan) fState
     modify $ set filterState fState'
-    if (code' `elem` solutions) || isNothing checkResult
-        then mzero
-        else do
-            let exs = fromJust checkResult
-            out <- liftIO $ toOutput env code' exs
-            lift $ writeSolution out
-            return $ Found (code', exs)
+    msum $ map (addEachSolution solutions) checkResult
+    where 
+        addEachSolution :: MonadIO m  => [RProgram] -> (RProgram, AssociativeExamples) -> BackTrack m SearchResult
+        addEachSolution sols (prog, exs)
+            | prog `elem` sols = mzero
+            | otherwise = do
+                out <- liftIO $ toOutput env prog exs
+                lift $ writeSolution out
+                return $ Found (prog, exs)
 
 runPNSolver :: MonadIO m => Environment -> RSchema -> [Example] -> PNSolver m ()
 runPNSolver env goal examples = do

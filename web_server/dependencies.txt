@@ -1,3 +1,0 @@
-Flask==1.1.1
-Flask-Cors==3.0.8
-expiringdict==1.2.0
