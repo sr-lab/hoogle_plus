@@ -1,4 +1,4 @@
-module HooglePlus.LinearSynth (linearSynth) where
+module HooglePlus.LinearSynth (linearSynth, isHigherOrderSign) where
 
 import Types.Filtering
 import HooglePlus.FilterTest

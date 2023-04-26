@@ -150,7 +150,7 @@ check env searchParams examples prog goalType solverChan = do
                     Just exs -> return [(prog, exs)]
         (_:_) -> do
             start <- liftIO getCPUTime
-            progs <- runExampleChecks searchParams env (lastType $ toMonotype goalType) prog {- examples -} [] solverChan
+            progs <- runExampleChecks searchParams env (lastType $ toMonotype goalType) prog examples solverChan
             end <- liftIO getCPUTime
             let diff = fromIntegral (end - start) / (10^12)
             let progs' = filter (not . hasSymbol) progs
@@ -186,11 +186,11 @@ runGhcChecks params env goalType examples prog = let
         typeCheckResult <- liftIO $ runInterpreter $ checkType expr modules
         strictCheckResult <- if disableDemand then return True else liftIO $ checkStrictness tyclassCount body funcSig modules
         -- still needed?
-        exampleCheckResult <- if not strictCheckResult then return Nothing else liftIO $ fmap ((:[]) . (body,)) <$> checkOutputs prog {-examples-} []
+        exampleCheckResult <- if not strictCheckResult then return Nothing else liftIO $ fmap ((:[]) . (body,)) <$> checkOutputs prog examples
         filterCheckResult <- if disableFilter || isNothing exampleCheckResult
                                 then return exampleCheckResult
                                 else do
-                                    filterResult <- runChecks env goalType prog
+                                    filterResult <- runChecks body funcSig modules
                                     if isNothing filterResult
                                        then return filterResult
                                        else return $ Just (fromJust exampleCheckResult ++ fromJust filterResult)

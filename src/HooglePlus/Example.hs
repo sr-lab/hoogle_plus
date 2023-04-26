@@ -190,11 +190,11 @@ programToExpr prog example argsNames = case removeTcargs prog of
   Nothing -> error "the program was only a tcarg"
 
   where 
-    -- returns the index of the argument: "arg2" -> 1
+    -- returns the index of the argument: "arg1" -> 1
     lookupArg :: String -> Maybe Int
     lookupArg id
       | id `elem` argsNames = case readMaybe (drop (length "arg") id) :: Maybe Int of
-          Just int -> Just $ int - 1
+          Just int -> Just $ int
           Nothing -> Nothing
       | otherwise = Nothing
 
@@ -204,7 +204,7 @@ programToExpr prog example argsNames = case removeTcargs prog of
       PSymbol id
         | "Sym" `isPrefixOf` id -> Sym $ ((read (drop (length "Sym") id)) :: Int)
         | otherwise -> case lookupArg id of
-            Just arg -> if length (input example) > arg then (input example) !! arg else error $ "error accessing argument list  (index is " ++ show arg ++ ")"
+            Just arg -> if arg < 0 then error ("Nani " ++ show arg ) else (if length (input example) > arg then (input example) !! arg else error $ "error accessing argument list  (index is " ++ show arg ++ ")")
             Nothing -> case lookupFun id of
               Just fun -> Var fun
               Nothing -> error $ "\'" ++ id ++ "\'" ++ " is not a symbol, nor a function or argument"

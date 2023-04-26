@@ -5,6 +5,7 @@ module Database.Environment(
   , toFunType
   , getFiles
   , filesToEntries
+  , filesToLinearSynthSymbs
   ) where
 
 import Data.Either
@@ -19,6 +20,7 @@ import Control.Monad.State (evalStateT)
 import System.Exit (exitFailure)
 import Text.Parsec.Pos (initialPos)
 import Text.Printf
+import Data.Maybe (fromJust)
 
 import Synquid.Error (Pos(Pos))
 import Synquid.Logic (ftrue)
@@ -36,6 +38,19 @@ import qualified Data.List.Utils as LUtils
 import qualified Types.Program as TP
 import Synquid.Util
 import qualified Debug.Trace as D
+
+import qualified HooglePlus.Example as Example
+import qualified SymbolicMatch.Samples as S
+
+import Debug.Trace (trace)
+import Data.Typeable (typeOf)
+import Control.Monad.IO.Class (liftIO)
+import Types.Filtering (FunctionSignature)
+import qualified Data.Text as T
+import HooglePlus.FilterTest (parseTypeString)
+import System.IO
+
+import HooglePlus.LinearSynth (isHigherOrderSign)
 
 writeEnv :: FilePath -> Environment -> IO ()
 writeEnv path env = B.writeFile path (encode env)
@@ -86,9 +101,10 @@ generateEnv genOpts = do
     let useHO = enableHOF genOpts
     let pkgOpts = pkgFetchOpts genOpts
     let mdls = modules genOpts
-    let mbModuleNames = if length mdls > 0 then Just mdls else Nothing
+    let mbModuleNames = if length mdls > 0 then Just ("Symbol":mdls) else Nothing
     pkgFiles <- getFiles pkgOpts
     allEntriesByMdl <- filesToEntries pkgFiles True
+    symsToLS <- filesToLinearSynthSymbs pkgFiles mdls
     DD.cleanTmpFiles pkgOpts pkgFiles
     let entriesByMdl = filterEntries allEntriesByMdl mbModuleNames
     let ourEntries = nubOrd $ concat $ Map.elems entriesByMdl
@@ -120,7 +136,9 @@ generateEnv genOpts = do
        Right env -> do
             let env' = env { _symbols = if useHO then env ^. symbols
                                                 else Map.filter (not . isHigherOrder . toMonotype) $ env ^. symbols,
-                           _included_modules = Set.fromList (moduleNames)
+                             --_included_modules = Set.fromList (moduleNames),
+                             _symsToLinearSynth = symsToLS,
+                             _included_modules = Set.fromList $ filter (/= "Symbol") moduleNames
                           }
             generateHigherOrder genOpts env'
     printStats result
@@ -141,8 +159,74 @@ toFunType t = t
 filesToEntries :: [FilePath] -> Bool -> IO (Map MdlName [Entry])
 filesToEntries fps renameFunc = do
     declsByModuleByFile <- mapM (\fp -> DC.readDeclarationsFromFile fp renameFunc) fps
-    return $ Map.unionsWith (++) declsByModuleByFile
+    -- we add to the existing components symbols
+    -- that are going to be replaced by the match algorithm
+    let symbolModule = DC.readDeclarationsFromStrings Example.symbolsDecls renameFunc
+    return $ Map.unionsWith (++) (symbolModule:declsByModuleByFile)
 
+filesToLinearSynthSymbs :: [FilePath] -> [String] -> IO [(String, FunctionSignature, Int)]
+filesToLinearSynthSymbs fps modules = do 
+  entries <- foldr (\fp r -> do r' <- r; c <- readFileToLS fp; return $ c ++ r') (return []) fps
+  return $ filter filterLS entries
+  where 
+    modulesText :: [T.Text]
+    modulesText = map T.pack modules
+
+    -- remove Data.Function as it is useless, higher order functions and "high polymorphic" functions
+    filterLS :: (String, FunctionSignature, Int) -> Bool
+    filterLS (name, sign, _) = let 
+      blackLst = ["Data.Function", "curry", "from", "bool"] in 
+        (all (not . (`isInfixOf` name)) blackLst) &&
+            (not (isHigherOrderSign sign))
+
+    readFileToLS :: FilePath -> IO [(String, FunctionSignature, Int)]
+    readFileToLS fp = do 
+      h <- openFile fp ReadMode
+      hSetEncoding h utf8
+      s <- hGetContents h
+      return $ parseLines (T.lines $ T.pack s) (T.pack "") False []
+      where 
+        parseLines :: [T.Text] 
+                   -> T.Text
+                   -> Bool -- whether the current module is to consider or not
+                   -> [(String, FunctionSignature, Int)]
+                   -> [(String, FunctionSignature, Int)]
+        parseLines [] _ modOk acc = acc
+        parseLines (h:t) curMod modOk acc
+          -- current line is a module declaration
+          | modOk && T.pack "forall" `T.isInfixOf` h = trace ("forall not supported on type declarations, skip declaration:" ++ T.unpack h) $ parseLines t curMod modOk acc
+          | Just mod <- T.stripPrefix (T.pack "module ") (T.strip h) =
+            let str = T.strip mod in
+              if T.null str 
+                then error "parse file LS" 
+                else parseLines t str (str `elem` modulesText) acc
+          -- current line is to ignore; no definition os function nor module
+          | T.pack "@" `T.isPrefixOf` (T.strip h) = parseLines t curMod modOk acc
+          | T.pack "data " `T.isPrefixOf` (T.strip h) = parseLines t curMod modOk acc
+          | T.pack "instance " `T.isPrefixOf` (T.strip h) = parseLines t curMod modOk acc
+          | T.pack "class " `T.isPrefixOf` (T.strip h) = parseLines t curMod modOk acc
+          | T.pack "infix " `T.isPrefixOf` (T.strip h) = parseLines t curMod modOk acc
+          | T.pack "infixr " `T.isPrefixOf` (T.strip h) = parseLines t curMod modOk acc
+          | T.pack "infixl " `T.isPrefixOf` (T.strip h) = parseLines t curMod modOk acc
+          | T.pack "type " `T.isPrefixOf` (T.strip h) = parseLines t curMod modOk acc
+          | T.pack "newtype " `T.isPrefixOf` (T.strip h) = parseLines t curMod modOk acc
+          | T.pack "--" `T.isPrefixOf` (T.strip h) = parseLines t curMod modOk acc
+          -- current line is a declaration id :: type, but ignore because 
+          -- that modules is not to consider
+          | not modOk = parseLines t curMod modOk acc
+          -- current line is a declaration id :: type, and the module is to consider
+          | otherwise = let decl = T.breakOn (T.pack "::") h in
+              let nm = T.unpack $ T.strip (fst decl) 
+                  ty = T.unpack $ fromJust $ T.stripPrefix (T.pack "::") $ T.strip (snd decl) in
+                if null nm || null ty 
+                  then error $ printf "name or type empty in %s" h
+                  else 
+                    let nmMod = if head nm == '('
+                        then '(' : ((T.unpack curMod) ++ "." ++ (tail nm)) 
+                        else (T.unpack curMod) ++ "." ++ nm 
+                      in case S.lookupFun nmMod of -- FIXME (2 things):trace should be error? reject h.o.
+                        Nothing -> parseLines t curMod modOk acc
+                        Just i -> parseLines t curMod modOk ((nmMod, parseTypeString ty , i):acc)
 
 getFiles :: PackageFetchOpts -> IO [FilePath]
 getFiles Hackage{packages=p} = mapM DD.getPkg p >>= (return . concat)
@@ -159,3 +243,4 @@ printStats env = do
   printf "types: %d; symbols: %d\n" typeCount symbolsCount
   printf "included types: %s\n" $ show (Map.keys typeMap)
   printf "included modules: %s\n" $ show (Set.elems modules)
+  printf "components in lambda-synthesizer: %d\n" (length (_symsToLinearSynth env))

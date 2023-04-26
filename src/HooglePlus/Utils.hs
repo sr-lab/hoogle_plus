@@ -112,6 +112,7 @@ removeTypeclasses = removeEmptyParens . removeTypeclassArgs . removeTypeclassIns
     where
         removeEmptyParens = removeAll (mkRegex "\\(\\ +\\)")
 
+printSolution :: UProgram -> IO ()
 printSolution solution = do
     putStrLn "*******************SOLUTION*********************"
     putStrLn $ "SOLUTION: " ++ toHaskellSolution (show solution)

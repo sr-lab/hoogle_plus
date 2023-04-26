@@ -47,7 +47,7 @@ import System.Exit
 import Text.Parsec.Indent
 import Text.Parsec.Pos
 import Text.Printf (printf)
-
+import qualified HooglePlus.Example as Ex (isSymbolWithPrefix)
 
 envToGoal :: Environment -> String -> IO Goal
 envToGoal env queryStr = do

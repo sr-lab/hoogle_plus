@@ -70,7 +70,6 @@ runExampleChecks :: MonadIO m
                  -> Chan Message
                  -> FilterTest m [UProgram]
 runExampleChecks params env goalType prog examples checkerChan = do
-
     if (not . checkFunctionsPresent) prog 
         then do
             liftIO $ writeChan checkerChan (MesgLog 1 "exampleCheck" ("Test \'" ++ show prog ++ "\': rejected by match (functions not supported by Match)."))

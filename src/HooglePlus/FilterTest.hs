@@ -1,6 +1,6 @@
 -- module HooglePlus.FilterTest (runChecks, checkSolutionNotCrash, checkDuplicates) where
 {-# LANGUAGE FlexibleContexts #-}
-module HooglePlus.FilterTest where
+module HooglePlus.FilterTest (runChecks, checkSolutionNotCrash, checkDuplicates, parseTypeString, runInterpreter', generateIOPairs, showParams) where
 
 import Language.Haskell.Interpreter hiding (get, set)
 import qualified Language.Haskell.Interpreter as LHI
@@ -39,7 +39,9 @@ parseTypeString :: String -> FunctionSignature
 parseTypeString input = FunctionSignature constraints argsType returnType
   where
     (constraints, argsType, returnType) = buildSig [] [] value
-    (ParseOk value) = parseType input
+    value = case parseType input of 
+      ParseOk v -> v
+      e -> error $ "parseType failed for input " ++ show input
 
     buildSig constraints argList (TyForall _ _ (Just ctx) t) = buildSig constraints' argList t
       where constraints' = constraints ++ extractConstraints constraints ctx
@@ -191,8 +193,8 @@ compareSolution :: [String] -> String -> [String] -> FunctionSignature -> Int ->
 compareSolution modules solution otherSolutions funcSig time = mapM (evaluateProperty modules) props
   where props = buildDupCheckProp (solution, otherSolutions) funcSig time defaultDepth
 
-runChecks :: MonadIO m => Environment -> RType -> UProgram -> FilterTest m (Maybe AssociativeExamples)
-runChecks env goalType prog = do
+runChecks :: MonadIO m => String -> String -> [String] -> FilterTest m (Maybe AssociativeExamples)
+runChecks body funcSig modules = do
   result <- runChecks_
 
   state <- get
@@ -200,7 +202,6 @@ runChecks env goalType prog = do
 
   return $ if result then Just (collectExamples body state) else Nothing
   where
-    (modules, funcSig, body, _) = extractSolution env goalType prog
     checks = [ checkSolutionNotCrash
              , checkDuplicates]
 
