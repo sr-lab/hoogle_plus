@@ -5,6 +5,7 @@ import Types.Type
 import Types.Common
 import Types.Generate
 import Types.IOFormat
+import Types.Filtering (FunctionSignature)
 
 import GHC.Generics hiding (to)
 import qualified Data.Set as Set
@@ -39,7 +40,8 @@ data Environment = Environment {
   _typClassInstances :: [(String, String)],
   _condTypClasses :: [([(String, [Set String])], (String, String))],
   _hoCandidates :: [Id],
-  _queryCandidates :: Map RSchema [Example]
+  _queryCandidates :: Map RSchema [Example],
+  _symsToLinearSynth :: [(String, FunctionSignature, Int)]
   } deriving(Generic)
 
 makeLenses ''Environment
@@ -66,5 +68,6 @@ emptyEnv = Environment {
   _typClassInstances = [],
   _condTypClasses = [],
   _hoCandidates = [],
-  _queryCandidates = Map.empty 
+  _queryCandidates = Map.empty,
+  _symsToLinearSynth = []
 }

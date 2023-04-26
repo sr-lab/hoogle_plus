@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 
 module HooglePlus.Example ( Example(..)
-                          , parseExamples
+                          , parseExamples'
                           , programToExpr
                           , changeSymbolsNames
                           , symbolsDecls
@@ -15,7 +15,7 @@ module HooglePlus.Example ( Example(..)
 import SymbolicMatch.Match
 import SymbolicMatch.Expr
 import SymbolicMatch.Samples (functionsInfo, lookupFun, isDataC, pair)
-import Types.Program
+import Types.Program hiding (expr)
 import Data.Maybe (listToMaybe)
 import Data.List (partition, isPrefixOf)
 
@@ -28,6 +28,7 @@ import Data.Maybe(mapMaybe)
 import Text.Printf (printf)
 
 import Debug.Trace (trace)
+import qualified Types.IOFormat as IOF
 
 symbolsInfo :: [(String, String)]
 symbolsInfo = [("symbolGen", "a")]
@@ -64,6 +65,25 @@ data Example = Example {
   output :: Expr
 } deriving Show
 
+parseExamples' :: [IOF.Example] -> Either String [Example]
+parseExamples' [] = Right []
+parseExamples' (IOF.Example{IOF.inputs=ins, IOF.output=out}:t) = 
+  case parseInputs ins of 
+    Nothing -> Left "Error parsing arguments of an example"
+    Just ins' -> case parse expr "" out of
+      Left err -> Left "Error parsing output of an example"
+      Right out' -> case parseExamples' t of
+        Left err' -> Left err'
+        Right exs -> Right $ Example{input = ins', output = out'} : exs
+  where 
+    parseInputs :: [String] -> Maybe [Expr]
+    parseInputs [] = Just []
+    parseInputs (h:t) = case parse expr "" h of
+      Left err -> Nothing
+      Right h' -> case parseInputs t of
+        Nothing -> Nothing
+        Just t' -> Just (h':t')
+
 -- | convert examples from a String to SymbolicMatch AST
 parseExamples :: String -> Either String [Example]
 parseExamples str = case parse expr "" str of
@@ -72,32 +92,32 @@ parseExamples str = case parse expr "" str of
     DataC "Cons" _ -> astExsToExamples (consToList examples)
     _ -> Left "Examples should be a list of pairs"
   Left err -> Left $ show err
+
+astExsToExamples :: [Expr] -> Either String [Example]
+astExsToExamples (e:es) = case e of 
+  DataC "Pair" [e1, e2] -> case e1 of 
+    list@(DataC n _) 
+      | n `elem` ["Cons", "Nil"] -> 
+        let ex = Example { input = consToList list
+                          , output = e2} in 
+          case astExsToExamples es of
+            Left err -> Left err
+            Right exs -> Right (ex:exs)
+      | otherwise -> Left "first element of an example must be a list" 
+    _ -> Left "first element of an example must be a list" 
+  _ -> Left "example must be a pair"
+astExsToExamples [] = Right []
+
+lexer :: TokenParser ()
+lexer = makeTokenParser style
   where
-    astExsToExamples :: [Expr] -> Either String [Example]
-    astExsToExamples (e:es) = case e of 
-      DataC "Pair" [e1, e2] -> case e1 of 
-        list@(DataC n _) 
-          | n `elem` ["Cons", "Nil"] -> 
-            let ex = Example { input = consToList list
-                             , output = e2} in 
-              case astExsToExamples es of
-                Left err -> Left err
-                Right exs -> Right (ex:exs)
-          | otherwise -> Left "first element of an example must be a list" 
-        _ -> Left "first element of an example must be a list" 
-      _ -> Left "example must be a pair"
-    astExsToExamples [] = Right []
+    style = emptyDef { identStart = letter
+                      , identLetter = alphaNum <|> char '.'
+                      , reservedNames = []}
 
-    lexer :: TokenParser ()
-    lexer = makeTokenParser style
-      where
-        style = emptyDef { identStart = letter
-                         , identLetter = alphaNum <|> char '.'
-                         , reservedNames = []}
-
-    expr :: Parser Expr
-    expr = try pair <|> dataConstr <|> nat <|> list <|> parens lexer expr <|> wildcard
-
+expr :: Parser Expr
+expr = try pair <|> dataConstr <|> nat <|> list <|> parens lexer expr <|> wildcard
+  where
     -- expression that does not need parens
     insideExpr :: Parser Expr
     insideExpr =  (do x <- identifier lexer; return $ DataC x [])

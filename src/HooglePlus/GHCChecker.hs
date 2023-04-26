@@ -4,7 +4,8 @@ module HooglePlus.GHCChecker (
     runGhcChecks, parseStrictnessSig, checkStrictness', check) where
 
 import Language.Haskell.Interpreter hiding (get)
-
+import HooglePlus.ExampleChecks
+import System.CPUTime (getCPUTime)
 import Types.Environment
 import Types.Program
 import Types.Type
@@ -53,6 +54,7 @@ import Control.Concurrent.Chan
 import Control.Monad.Trans.State
 import Control.Concurrent
 import Debug.Trace
+import qualified HooglePlus.Example as Ex -- fixme delete original Example, keep SymbolicMatch Example
 
 showGhc :: (Outputable a) => a -> String
 showGhc = showPpr unsafeGlobalDynFlags
@@ -136,11 +138,34 @@ check :: MonadIO m
        -> RSchema -- goal type to be checked against
        -> Chan Message -- message channel for logging
        -> FilterTest m [(RProgram, AssociativeExamples)] -- return Nothing is check fails, otherwise return a list of updated examples
-check env searchParams examples program goalType solverChan = do
-    mbAssoc <- runGhcChecks searchParams env (lastType $ toMonotype goalType) examples program
-    case mbAssoc of
-        Nothing -> return []
-        Just assoc -> return [(program, assoc)]
+check env searchParams examples prog goalType solverChan = do
+    case examples of 
+        []  | hasSymbol prog -> do
+                liftIO $ writeChan solverChan (MesgLog 1 "filterCheck" ("Test \'" ++ show prog ++ "\': rejected (symbol not replaced)."))
+                return []
+            | otherwise -> do 
+                ghcCheck <- runGhcChecks searchParams env (lastType $ toMonotype goalType) examples prog
+                case ghcCheck of
+                    Nothing -> return []
+                    Just exs -> return [(prog, exs)]
+        (_:_) -> do
+            start <- liftIO getCPUTime
+            progs <- runExampleChecks searchParams env (lastType $ toMonotype goalType) prog {- examples -} [] solverChan
+            end <- liftIO getCPUTime
+            let diff = fromIntegral (end - start) / (10^12)
+            let progs' = filter (not . hasSymbol) progs
+            case progs' of
+                []  -> return []
+                _:_ -> do
+                    ghcChecks <- mapM (runGhcChecks searchParams env (lastType $ toMonotype goalType) examples) progs'
+                    return $ mapMaybe (\(p, exs) -> do {exs' <- exs; return (p, exs')}) $ zip progs' ghcChecks
+        where
+            hasSymbol :: UProgram -> Bool
+            hasSymbol prog = case content prog of
+                PSymbol id -> any (\(s, _) -> s `isInfixOf` id) Ex.symbolsInfo
+                PApp id args -> 
+                    any (\(s, _) -> s `isInfixOf` id) Ex.symbolsInfo || any hasSymbol args
+                _ -> error "Solution not expexted to have other than PSym and PApp."
 
 -- validate type signiture, run demand analysis, and run filter test
 -- checks the end result type checks; all arguments are used; and that the program will not immediately fail
@@ -160,7 +185,8 @@ runGhcChecks params env goalType examples prog = let
     in do
         typeCheckResult <- liftIO $ runInterpreter $ checkType expr modules
         strictCheckResult <- if disableDemand then return True else liftIO $ checkStrictness tyclassCount body funcSig modules
-        exampleCheckResult <- if not strictCheckResult then return Nothing else liftIO $ fmap ((:[]) . (body,)) <$> checkOutputs prog examples
+        -- still needed?
+        exampleCheckResult <- if not strictCheckResult then return Nothing else liftIO $ fmap ((:[]) . (body,)) <$> checkOutputs prog {-examples-} []
         filterCheckResult <- if disableFilter || isNothing exampleCheckResult
                                 then return exampleCheckResult
                                 else do
@@ -177,10 +203,3 @@ runGhcChecks params env goalType examples prog = let
         (modules, funcSig, body, argList) = extractSolution env goalType prog
         checkOutputs prog exs = checkExampleOutput mdls env funcSig (show prog) exs
 
--- ensures that the program type-checks
-checkType :: String -> [String] -> Interpreter Bool
-checkType expr modules = do
-    setImports modules
-    -- Ensures that if there's a problem we'll know
-    Language.Haskell.Interpreter.typeOf expr
-    typeChecks expr

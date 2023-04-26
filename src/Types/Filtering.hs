@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 module Types.Filtering where
 
 import Control.Exception
@@ -6,6 +7,8 @@ import Data.Typeable
 import Text.Printf
 import Data.List (intercalate)
 import Types.IOFormat (Example)
+import Data.Serialize
+import GHC.Generics hiding (to)
 
 import Test.SmallCheck.Drivers
 
@@ -53,7 +56,7 @@ data ArgumentType =
   | ArgTypeTuple [ArgumentType]
   | ArgTypeApp  ArgumentType ArgumentType
   | ArgTypeFunc ArgumentType ArgumentType
-  deriving (Eq)
+  deriving (Eq, Generic)
 
 instance Show ArgumentType where
   show (Concrete    name) = name
@@ -64,12 +67,17 @@ instance Show ArgumentType where
     (printf "(%s)" . intercalate ", " . map show) types
   show (ArgTypeFunc src dst) = printf "((%s) -> (%s))" (show src) (show dst)
 
+instance Serialize ArgumentType
+
 newtype NotSupportedException = NotSupportedException String
   deriving (Show, Typeable)
 
 instance Exception NotSupportedException
 
 data TypeConstraint = TypeConstraint String String
+  deriving (Generic)
+
+instance Serialize TypeConstraint
 
 instance Show TypeConstraint where
   show (TypeConstraint name constraint) = printf "%s %s" constraint name
@@ -78,7 +86,7 @@ data FunctionSignature =
   FunctionSignature { _constraints :: [TypeConstraint]
                     , _argsType :: [ArgumentType]
                     , _returnType :: ArgumentType
-  }
+  } deriving (Generic)
 
 instance Show FunctionSignature where
   show (FunctionSignature constraints argsType returnType) =
@@ -86,6 +94,8 @@ instance Show FunctionSignature where
       where
         constraintsExpr = (intercalate ", " . map show) constraints
         argsExpr = (intercalate " -> " . map show) (argsType ++ [returnType])
+
+instance Serialize FunctionSignature
 
 data FilterState = FilterState {
   inputs :: [[String]],
