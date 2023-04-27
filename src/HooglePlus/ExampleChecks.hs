@@ -93,7 +93,7 @@ runExampleChecks params env goalType prog examples checkerChan = do
                 -- get symbols of the remaining symbols (functions) if any
                 let (_, _, lambda, _) = extractSolution env goalType prog''
                 let lambda' = T.unpack $ T.replace (T.pack "Sym") (T.pack "_Sym") (T.pack lambda)
-                let expr = lambda' ++ " :: " ++ funcSig
+                let expr = "(" ++ lambda' ++ ") :: " ++ funcSig
                 mbsts <- getHolesTypes expr modules "Sym"
                 
                 case mbsts of
@@ -282,7 +282,7 @@ runExampleChecks params env goalType prog examples checkerChan = do
         replaceWilcards :: MonadIO m => UProgram -> FilterTest m (Maybe UProgram)
         replaceWilcards p = do
             let (modules, funcSig, lambda, _) = extractSolution env goalType p
-            let expr = printf "%s :: %s" lambda funcSig
+            let expr = printf "(%s) :: %s" lambda funcSig
             mbwts <- getHolesTypes expr modules ""
             case mbwts of
                 -- error getting holes types due to compilation error
