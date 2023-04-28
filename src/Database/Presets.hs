@@ -34,11 +34,10 @@ myModules = [
   "GHC.List",
   "Data.Eq",
   "Data.Ord",
-  "Data.List",
+  --"Data.List",
   "Data.Function",
   -- ByteString
   "Data.ByteString.Lazy",
-  "Data.ByteString.Builder",
   "Data.ByteString.Builder",
   "GHC.Num"
   ]
