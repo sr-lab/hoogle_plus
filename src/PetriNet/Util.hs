@@ -177,7 +177,8 @@ unHTML = unescapeHTML . innerTextHTML
 
 toOutput :: Environment -> RProgram -> AssociativeExamples -> IO QueryOutput
 toOutput env soln exs = do
-    let symbols = Set.toList $ symbolsOf soln
+    -- lambda abstractions are contained as a single symbol, so filter them
+    let symbols = filter (not . ("->" `isInfixOf`)) $ Set.toList $ symbolsOf soln
     let argNames = Map.keys $ env ^. arguments
     let args = Map.toList $ env ^. arguments
     let argDocs = map (\(n, ty) -> FunctionDoc n (show ty) "") args
