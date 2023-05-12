@@ -117,12 +117,9 @@ linearSynth env typeStr argList ioExamplesOrFn nextSym = do
                           , stNextSym = nextSym
                           , stSolutions = []}
   let exprs = stSolutions $ execState (completeExpr expr [(nextSym, _returnType goal, 0)] False 0 0) initSt
-  --hPutStrLn stderr $ "EXPRS: " ++ (show $ length exprs)
-  --hPutStrLn stderr $ "goal is " ++ show goal
-  --hPutStrLn stderr $ "EXPRS(" ++ (show $ length exprs) ++ "): " ++ show (toString (map (\(_,e,_) -> e) exprs))
-  let toMatch ={- take 100000 $-} map (\(_,e,_)->e) $ sortOn (\(lev, _, sym) -> lev + if sym then 2 else 0) $ filterArgs $ exprs
+  let noSymRt = foldr (\(_,_,b) r -> if b then r else 1 + r) 0 exprs
+  let toMatch ={- take 100000 $-} trace ("NoSym is " ++ show noSymRt ++ "out of " ++ show (length exprs)) $ map (\(_,e,_)->e) $ sortOn (\(lev, _, sym) -> lev + if sym then 2 else 0) $ filterArgs $ exprs
   matched <- applyMatch toMatch
-  --hPutStrLn stderr $ "matched: " ++ show (toString matched) ++ " toMatch: " ++ show (toString toMatch)
   let filtered = filterValid $ filterSyms matched
   return $ map replaceNamesTyg $ toString $ map toLam $ take 10 filtered
     where
@@ -184,9 +181,7 @@ linearSynth env typeStr argList ioExamplesOrFn nextSym = do
       applyMatchFn :: (E.Expr -> Either MatchError [(Int, [E.Expr], E.Expr)]) -> [E.Expr] -> IO [E.Expr]
       applyMatchFn fn [] = return []
       applyMatchFn fn (e:es) = do
-        --hPutStrLn stderr $ "TestingFn " ++ E.showExpr S.functionsNames e
         let lam = toLam e
-        --hPutStrLn stderr (E.showExpr S.functionsNames e)
         res <- timeout 100000 $ (let r = fn lam in r `seq` return r)
         case res of
           Just (Right cs) -> do
@@ -198,9 +193,8 @@ linearSynth env typeStr argList ioExamplesOrFn nextSym = do
       -- replace symbols/test with examples
       -- there is a single tygar example, otherwise applyMatchFn must be used
       applyMatchIoExs :: [([E.Expr], E.Expr)] -> Example -> [E.Expr] -> IO [E.Expr]
-      applyMatchIoExs ioExs tygEx [] = hPutStrLn stderr ("Exs: " ++ show ioExs) >> return []
+      applyMatchIoExs ioExs tygEx [] = return []
       applyMatchIoExs ioExs tygEx (e:es) = do
-        --hPutStrLn stderr $ "Testing " ++ E.showExpr S.functionsNames e
         let replacedTygArgs = 
               foldr (\(id, val) r -> E.replace r (E.Var id) val) e (zip tygIds (input tygEx)) 
         let pairs = 
@@ -208,15 +202,13 @@ linearSynth env typeStr argList ioExamplesOrFn nextSym = do
                 (\(args, val) -> 
                   (foldr 
                     (\(varId, argVal) r -> E.replace r (E.Var varId) argVal) replacedTygArgs (zip lamIds args), val))
-                ioExs
+                ioExs 
         res <- timeout 100000 $ (let r = matchPairsPretty 300 pairs S.functionsEnv in r `seq` return r)
         case res of
           Just (Right cs) -> do
             remaining <- applyMatchIoExs ioExs tygEx es
             return $ (E.replaceSyms cs e) : remaining
-          _ -> do
-            --hPutStrLn stderr $ "Rejected (" ++ show res ++ "): " ++ E.showExpr S.functionsNames e
-            applyMatchIoExs ioExs tygEx es
+          _ -> applyMatchIoExs ioExs tygEx es
         
       -- convert to string
       toString :: [E.Expr] -> [String]
@@ -263,7 +255,7 @@ linearSynth env typeStr argList ioExamplesOrFn nextSym = do
                 (stEnv state)
         
         -- update nextSymbol
-        put state{stNextSym = stNextSym state + 10} -- FIXME corrigir valor exato
+        put state{stNextSym = stNextSym state + 10} -- should be an exact value
         
         -- do all actions
         sequence_ candidatesArgs

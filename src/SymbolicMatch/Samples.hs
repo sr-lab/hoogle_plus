@@ -310,10 +310,7 @@ maximumF = Lam [0]
   (Case (Var 0)
     [
       Alt "Nil" [] (DataC "Error" []),
-      Alt "Cons" [1, 2] (Case (Var 2) [
-        Alt "Nil" [] (Var 1),
-        Alt "Cons" [3, 4] (App (Var $ -51) [Var 1, App (Var $ -47) [Var 2]])
-      ])
+      Alt "Cons" [1, 2] (App (Var $ -51) [Var 1, App (Var $ -47) [Var 2]])
     ]
   )
 
@@ -323,10 +320,7 @@ minimumF = Lam [0]
   (Case (Var 0)
     [
       Alt "Nil" [] (DataC "Error" []),
-      Alt "Cons" [1, 2] (Case (Var 2) [
-        Alt "Nil" [] (Var 1),
-        Alt "Cons" [3, 4] (App (Var $ -52) [Var 1, App (Var $ -48) [Var 2]])
-      ])
+      Alt "Cons" [1, 2] (App (Var $ -52) [Var 1, App (Var $ -48) [Var 2]])
     ]
   )
 
@@ -1158,6 +1152,15 @@ nilF = Lam [] (DataC "Nil" [])
 
 consF :: Expr
 consF = Lam [0, 1] (DataC "Cons" [Var 0, Var 1])
+
+repeatF :: Expr
+repeatF = Lam [0] (DataC "Cons" [Var 0, App (Var $ -93) [Var 0]])
+
+cycleF :: Expr
+cycleF = Lam [0] (App (Var $ -5) [Var 0, App (Var $ -94) [Var 0]]) 
+
+iterateF :: Expr 
+iterateF = Lam [0, 1] (cons (Var 1) (App (Var $ -95) [Var 0, App (Var 0) [Var 1]]))
 
 functionsInfo :: [(Int, Expr, String)]
 functionsInfo =
