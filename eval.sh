@@ -12,6 +12,8 @@ then
     echo "44 benchmark on original Hoogle+"
     cd hoogle_plus_orig/
     sh eval_orig.sh $*
+    echo "44 benchmark on original Hoogle+ without constants"
+    sh eval_orig_nc.sh $*
     cd ..
 fi
 if test $# -eq 0 || (test $# -eq 1 && test $1 = $FLAG_SET_2)

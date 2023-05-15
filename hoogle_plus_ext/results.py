@@ -21,17 +21,16 @@ exercises = [ "firstRight", "firstKey", "flatten", "repl-funcs", "containsEdge",
 dir1 = "hoogle_plus_ext/logs"
 dir2 = "hoogle_plus_orig/logs"
 dir3 = "hoogle_plus_examp/logs"
-dir4 = "hoogle_plus_orig/logs-nc"
 
 print("\\documentclass{article}")
 print("\\begin{document}")
 print("\\begin{table}")
 print("\\centering")
 print("\\caption{Results of the first set of benchmarks (collected ", time.asctime() ,"). Table 3 in the paper.}", sep='')
-print("\\begin{tabular}{rl||rr||rr||rr}")
+print("\\begin{tabular}{rl||rr||rr}")
 print("\\hline ")
-print(" & & \\multicolumn{2}{c||}{\\textsc{Hoogle+}} & \\multicolumn{2}{c||}{\\textsc{Hoogle+ n.c.}} & \\multicolumn{2}{c}{Our Extension} \\\\")    
-print("\\# & Benchmark & Time (s) & Sols. & Time (s) & Sols. & Time (s) & Sols. \\\\ \\hline")
+print(" & & \\multicolumn{2}{c||}{\\textsc{Hoogle+}} & \\multicolumn{2}{c}{Our Extension} \\\\")    
+print("\\# & Benchmark & Time (s) & Sols. & Time (s) & Sols. \\\\ \\hline")
 
 ind = 0
 for n in exercises:
@@ -39,16 +38,14 @@ for n in exercises:
     try:
         logfileE = open(dir1 + "/" + n + ".log")
         logfileO = open(dir2 + "/" + n + ".log")
-        logfileO_nc = open(dir4 + "/" + n + ".log")
     except:
         continue
 
     linesE = logfileE.readlines()
     linesO = logfileO.readlines()
-    linesO_nc = logfileO_nc.readlines()
     
-    solsE, solsO, solsO_nc = len(linesE) // 2, len(linesO) // 2, len(linesO_nc) // 2
-    timeE = timeO = timeO_nc = '-'
+    solsE, solsO = len(linesE) // 2, len(linesO) // 2
+    timeE = timeO = '-'
 
     if len(linesO) > 1:
         timesO = linesO[1].split()
@@ -63,19 +60,11 @@ for n in exercises:
             timeE = round(float(timesE[1]), 2)
         else:
             raise ValueError('Expected two real numbers')
-        
-    if len(linesO_nc) > 1:
-        timesO_nc = linesO_nc[1].split()
-        if len(timesO_nc) == 1:
-            timeO_nc = round(float(timesO_nc[0]), 2)
-        else:
-            raise ValueError('Expected one real number')
     
-    print(ind, "&", n, "&", timeO, "&", solsO, "&", timeO_nc, "&", solsO_nc, "&", timeE, "&", solsE, "\\\\")
+    print(ind, "&", n, "&", timeO, "&", solsO, "&", timeE, "&", solsE, "\\\\")
     
     logfileO.close()
     logfileE.close()
-    logfileO_nc.close()
 
 print("\\hline ")
 print("\\end{tabular}")

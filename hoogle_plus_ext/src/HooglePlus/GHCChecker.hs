@@ -287,6 +287,7 @@ runExampleChecks params env goalType prog examples checkerChan = do
                                 liftIO $ writeChan checkerChan (MesgLog 1 "exampleCheck" ("Test \'" ++ show prog ++ "\': rejected by match (compilation)"))
                                 return []
                     Just sts -> do
+                        liftIO $ putStrLn $ "... synthesizing lambdas for " ++ d
                         -- if any symbol is not a function, it should be replace by match, before...
                         when (not (allFunTys sts)) $ error "Non function symbol found after match"
                         -- FIXME: should set seed for widlcards in lams, otherwise may colide
@@ -304,7 +305,7 @@ runExampleChecks params env goalType prog examples checkerChan = do
                                 let r = catMaybes mbsProgs
                                 return $ r
     where
-        (modules, funcSig, _, argList) = extractSolution env goalType prog
+        (modules, funcSig, d, argList) = extractSolution env goalType prog
 
         progWithGoodSymNames :: UProgram
         progWithGoodSymNames = case removeTcargs (changeSymbolsNames $ removeTc prog) of
@@ -387,7 +388,7 @@ runExampleChecks params env goalType prog examples checkerChan = do
                     WontCompile msgs -> let msgAsTexts = map (\(GhcError m) -> T.pack m) msgs in
                         if all (\m -> T.pack "Found hole" `T.isInfixOf` m) msgAsTexts
                             then return $ Just $ mapMaybe (extractType (T.pack prefix)) msgAsTexts
-                            else trace ("Error: " ++ show msgs) $  return Nothing
+                            else trace ("Error on expr: " ++ expr ++ ": " ++ show msgs) $  return Nothing
                     _ -> trace "getHolesTypes: Expected error message to be WontCompile" $ return Nothing
                 Right _ -> return (Just [])
 

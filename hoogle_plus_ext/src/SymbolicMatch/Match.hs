@@ -22,7 +22,7 @@ match :: Expr
     -> (S.State -> Either MatchError C.ConstrSet)
     -> Either MatchError C.ConstrSet
 
-match _ state WildCard ct -- = Left $ Exception "Error"
+match _ state WildCard ct
   | S.reachMaxDepth state = Left DepthReached
   | otherwise = ct (S.incDepth state)
 
@@ -76,7 +76,7 @@ match (App e es) state dst ct
   | otherwise =
       case e of
         (Lam ps e')
-          | length es == length ps -> case evalMany state es of
+          | length es == length ps -> case evalMany 300 state es of
                 Left ex -> Left $ Exception ex
                 Right es' -> let (pairs, args, state') = appArgs es' state
                                  state'' = S.bindAll (zip ps args) state'
@@ -85,7 +85,7 @@ match (App e es) state dst ct
           | otherwise -> Left $ Exception $ "argument and param mismatch: " ++ show e ++ ";;;" ++ show es
         (Var n) -> let e' = S.unsafeGet n state ("App variable " ++ show n ++ " not found") in
             match (App e' es) (S.incDepth state) dst ct
-        (Sym n) -> case evalMany state es of -- expects that the arguments of symbols applications does not have branches
+        (Sym n) -> case evalMany 300 state es of -- expects that the arguments of symbols applications does not have branches
             Left s -> Left (Exception s)
             Right es' -> case S.lookupApp n es' state of
               Just e -> match dst state e ct

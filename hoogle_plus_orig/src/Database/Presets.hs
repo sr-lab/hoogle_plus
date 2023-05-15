@@ -4,9 +4,9 @@ import Types.Generate
 import Types.Experiments
 import Types.Environment
 
-getOptsFromPreset :: Preset -> GenerationOpts
-getOptsFromPreset TotalFunctions = genOptsTier1
-getOptsFromPreset PartialFunctions = genOptsTier2
+getOptsFromPreset :: Preset -> Bool -> GenerationOpts
+getOptsFromPreset TotalFunctions nc = genOptsTier1 {noConsts = nc}
+getOptsFromPreset PartialFunctions nc = genOptsTier2 {noConsts = nc}
 
 genOptsTier1 = defaultGenerationOpts {
   modules = myModules,

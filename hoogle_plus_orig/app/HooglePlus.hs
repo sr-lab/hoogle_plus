@@ -124,9 +124,9 @@ main = do
                 hClose h
               else executeSearch synquidParams searchParams file Nothing
             
-        Generate {preset = (Just preset)} -> do
-            precomputeGraph (getOptsFromPreset preset)
-        Generate Nothing files pkgs mdls d ho pathToEnv hoPath -> do
+        Generate {preset = (Just preset), noconsts = nc} -> do
+            precomputeGraph (getOptsFromPreset preset nc)
+        Generate Nothing files pkgs mdls d ho pathToEnv hoPath nc -> do
             let fetchOpts =
                     if (length files > 0)
                         then Local files
@@ -184,7 +184,8 @@ data CommandLineArgs
         type_depth :: Int,
         higher_order :: Bool,
         env_file_path_out :: String,
-        ho_path :: String
+        ho_path :: String,
+        noconsts :: Bool
       }
   deriving (Data, Typeable, Show, Eq)
 
@@ -218,7 +219,8 @@ generate = Generate {
   type_depth           = 2               &= help ("Depth of the types to be instantiated for polymorphic type constructors"),
   higher_order         = True            &= help ("Include higher order functions (default: True)"),
   env_file_path_out    = defaultEnvPath  &= help ("Environment file path (default:" ++ (show defaultEnvPath) ++ ")"),
-  ho_path              = "ho.txt"        &= typFile &= help ("Filename of components to be used as higher order arguments")
+  ho_path              = "ho.txt"        &= typFile &= help ("Filename of components to be used as higher order arguments"),
+  noconsts            = False           &= help ("Remove constants (default: False)")
 } &= help "Generate the type conversion database for synthesis"
 
 mode = cmdArgsMode $ modes [synt, generate] &=

@@ -98,15 +98,16 @@ generateEnv genOpts = do
                                                 else Map.filter (not . isHigherOrder . toMonotype) $ env ^. symbols,
                            _included_modules = Set.fromList (moduleNames)
                           }
+            let env'' = if (noConsts genOpts) then env' {_symbols = Map.filterWithKey (\k _ -> not $ any (\s -> k `isInfixOf`s ) ["Data.Bool.True", "Data.Bool.False", "Data.Maybe.Nothing", "Nil"]) (env ^. symbols)} else env'
             hofStr <- readFile pathToHo
             let hofNames = words hofStr
             -- get signatures
-            let sigs = map (\f -> lookupWithError "env: symbols" f (env' ^. symbols)) hofNames
+            let sigs = map (\f -> lookupWithError "env: symbols" f (env'' ^. symbols)) hofNames
             -- transform into fun types and add into the environments
             let sigs' = zipWith (\n t -> (n ++ hoPostfix, toFunType t)) hofNames sigs
-            let env'' = env' { _symbols = Map.union (env' ^. symbols) (Map.fromList sigs')
+            let env''' = env'' { _symbols = Map.union (env'' ^. symbols) (Map.fromList sigs')
                              , _hoCandidates = map fst sigs' }
-            return env''
+            return env'''
     printStats result
     return result
    where
