@@ -237,8 +237,7 @@ runGhcChecks params env goalType prog checkerChan = let
                     liftIO $ writeChan checkerChan (MesgLog 1 "exampleCheck" ("Test \'" ++ show prog ++ "\': rejected by GHC: dependency analysis."))
                     return Nothing
 
--- run the match algorithm against an example and return
--- new programs with the symbols replaced
+-- complete the functions synthesized by the Petri net, by replacing fits for the holes
 runExampleChecks :: MonadIO m 
                  => SearchParams 
                  -> Environment 
@@ -246,12 +245,14 @@ runExampleChecks :: MonadIO m
                  -> UProgram 
                  -> [Example]
                  -> Chan Message
-                 -> FilterTest m [UProgram]
+                 -> FilterTest m [UProgram] -- a single function from the Petri net can be completed in different ways
 runExampleChecks params env goalType prog examples checkerChan = do
+    -- check the presence of unsupported functions 
     if (not . checkFunctionsPresent) prog 
         then do
             liftIO $ writeChan checkerChan (MesgLog 1 "exampleCheck" ("Test \'" ++ show prog ++ "\': rejected by match (functions not supported by Match)."))
             return []
+        -- run the unification algorithm
         else case Match.matchPairsPretty 200 pairs functionsEnv of
             Left err -> 
                 case err of 

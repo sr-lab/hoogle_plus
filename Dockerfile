@@ -20,14 +20,9 @@ ADD z3/bin/z3 /usr/bin
 RUN apt-get install -y libtinfo-dev zlib1g-dev haskell-stack build-essential
 RUN stack upgrade
 ENV PATH="/root/.local/bin:${PATH}"
-RUN echo system-ghc: true >> ~/.stack/config.yaml 
+#RUN echo system-ghc: true >> ~/.stack/config.yaml 
 
-# install GHC
 RUN apt install -y wget libnuma-dev libncurses5
-RUN wget https://downloads.haskell.org/~ghc/8.4.4/ghc-8.4.4-x86_64-deb9-linux.tar.xz
-RUN tar -xf ghc-8.4.4-x86_64-deb9-linux.tar.xz
-RUN cd ghc-8.4.4 && ./configure
-RUN cd ghc-8.4.4 && make install
 
 # Get tools for the evaluation
 RUN apt-get install -y python3

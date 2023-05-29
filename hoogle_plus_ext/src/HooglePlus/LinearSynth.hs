@@ -106,7 +106,7 @@ linearSynth :: [(String, FunctionSignature, Int)] -- env
             -> [(Id, RSchema)]  -- argList from original function
             -> Either -- two options:
                 (E.Expr -> Either MatchError [(Int, [E.Expr], E.Expr)]) -- function if the examples cannot be used
-                ([([E.Expr], E.Expr)], Example) -- input output examples if well generated or 
+                ([([E.Expr], E.Expr)], Example) -- input output examples if well generated
             -> Int              -- next sym to use
             -> IO [String]     -- lambdas
 linearSynth env typeStr argList ioExamplesOrFn nextSym = do
@@ -118,7 +118,7 @@ linearSynth env typeStr argList ioExamplesOrFn nextSym = do
                           , stSolutions = []}
   let exprs = stSolutions $ execState (completeExpr expr [(nextSym, _returnType goal, 0)] False 0 0) initSt
   let noSymRt = foldr (\(_,_,b) r -> if b then r else 1 + r) 0 exprs
-  let toMatch ={- take 100000 $-} trace ("NoSym is " ++ show noSymRt ++ "out of " ++ show (length exprs)) $ map (\(_,e,_)->e) $ sortOn (\(lev, _, sym) -> lev + if sym then 2 else 0) $ filterArgs $ exprs
+  let toMatch = map (\(_,e,_)->e) $ sortOn (\(lev, _, sym) -> lev + if sym then 2 else 0) $ filterArgs $ exprs
   matched <- applyMatch toMatch
   let filtered = filterValid $ filterSyms matched
   return $ map replaceNamesTyg $ toString $ map toLam $ take 10 filtered

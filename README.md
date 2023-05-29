@@ -1,12 +1,13 @@
-This readme contains information about the contents of this docker image.
+This README contains information about the contents of this docker image.
 
 # Overview
 
-* This **Docker image** contains the artifcat of the paper 
-  > Hoogle⋆: Constants and λ-abstractions in Petri-net-based Synthesis using Symbolic Execution 
+* This **Docker image** contains the artifact of the paper 
+  > Henrique Botelho Guerra, João F. Ferreira, and João Costa Seco, Hoogle⋆: Constants and λ-abstractions in 
+Petri-net-based Synthesis using Symbolic Execution, in 37th European Conference on Object-Oriented Programming (ECOOP 2023), LIPIcs, Vol.~263, 2023. <https://doi.org/10.4230/LIPIcs.ECOOP.2023.38>
 * The image contains:
   - the **Haskell source code of Hoogle⋆**, the extension of Hoogle+, which is already compiled and ready to use;
-  - a script to run the expriments described in Section 5 of the paper, generating tables 3 and 4 of the paper;
+  - a script to run the experiments described in Section 5 of the paper, generating tables 3 and 4 of the paper;
   - and, for evaluation purposes, it also includes the two versions of Hoogle (the original one, and the version that supports input-output examples) already compiled and ready to use. 
 
 * The artifact is functional, reusable, and available.
@@ -39,17 +40,25 @@ In our paper, we propose an extension to the Hoogle+ program synthesizer so that
 To change the way the occurrences of the wildcard component are replaced, simply redefine the function runExampleChecks (`/home/hoogle_plus_ext/src/HooglePlus/GHCChecker.hs`).
 
 ## Artifact’s availability
-We plan to place the artifact on [DARTS](https://drops.dagstuhl.de/opus/institut_darts.php) and agree with a Creative Commons license.
+The artifact is on [DARTS](https://drops.dagstuhl.de/opus/institut_darts.php).
 
 ## Artifact Requirements
 Only `docker` is required.
 
 # Getting Started
+## Load the Docker image
+
+```
+docker load < hoogle-star_latest.gz
+docker run -it hoogle-star:latest
+```
+
+## Structure
 * The artifact includes, already compiled and ready to use:
   - the extension to the Hoogle+, Hoogle⋆, in folder `/home/hoogle_plus_ext/`;
   - the original version of Hoogle+, in folder `/home/hoogle_plus_orig/`;
   - the original version of Hoogle+, in folder `/home/hoogle_plus_examp/`;
-* It alse includes the script `/home/eval.sh`, to run the evaluation.
+* It also includes the script `/home/eval.sh`, to run the evaluation.
 
 ## The script `/home/eval.sh` 
 The script `/home/eval.sh` runs the evaluation done in section 5 of the paper, and generates tables 3 and 4. In detail, it does the following:
@@ -87,22 +96,18 @@ The scripts `/home/hoogle_plus_ext/eval_ext.hs`, `/home/hoogle_plus_examp/eval_e
     ```
 
 ## The script `/home/health-check.sh` 
-We provide a script (`/home/health-check.sh`), that runs a smaller, faster subset of benchamarks to check whether everything is working well. It takes 5 minutes: it runs Hoogle+ and Hoogle* on benchmark 3 and runs Hoogle+ with examples and Hoogle* on benchmark 50. We have chosen these benchmarks because they are all solved by Hoogle+ and Hoogle*. To run the script:
+We provide a script (`/home/health-check.sh`), that runs a smaller, faster subset of benchmarks to check whether everything is working well. It takes 5 minutes: it runs Hoogle+ and Hoogle* on benchmark 3 and runs Hoogle+ with examples and Hoogle* on benchmark 50. We have chosen these benchmarks because they are all solved by Hoogle+ and Hoogle*. To run the script:
 
 ```
 cd /home
 sh health-check.sh
 ```
 The results are in the following log files:
-| Benchmark | Tool | Log file| Solutions in AMD 5500U 12 GB Ubuntu22, inside docker |
+| Benchmark | Tool | Log file| Solutions in AMD 5600G 16 GB Ubuntu 22.04, inside docker |
 | ----------- | ----------- |----------- | ------|
 | `flatten` | Hoogle+ | `hoogle_plus_orig/logs/flatten.log`| 5|
 | `flatten` | Hoogle* | `hoogle_plus_ext/logs/flatten.log`| 5 |
-| `removeFirstOnes` | Hoogle+ with examples | `hoogle_plus_examp/logs/removeFirstOnes.log`| 1|
-| `removeFirstOnes` | Hoogle*| `hoogle_plus_ext/logs/removeFirstOnes.log`| 11 |
-
+| `removeFirstOnes` | Hoogle+ with examples | `hoogle_plus_examp/logs/removeFirstOnes.log`| 1 |
+| `removeFirstOnes` | Hoogle*| `hoogle_plus_ext/logs/removeFirstOnes.log`| 12 |
   
-Note that each solution has two lines: the synthesized function and the time(s).
-
-
-FIXME tempos
+Note that in the log files, each solution has two lines: the synthesized function and the time(s).
